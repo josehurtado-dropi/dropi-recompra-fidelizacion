@@ -1941,16 +1941,15 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
           </div>
         </div>
 
-        <!-- Productos cargados dinámicamente desde Supabase -->
         <div class="carousel-wrap">
           <button class="carousel-nav prev" onclick="prevProduct()" aria-label="Anterior">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
           <div class="carousel-track" id="productosCarouselTrack">
-            <!-- Los productos se insertan aquí por JavaScript desde Supabase -->
+            <!-- Productos cargados dinámicamente desde Supabase -->
             <div class="prod-card carousel-slide active" style="justify-content:center;align-items:center;min-height:200px;">
               <div style="text-align:center;color:var(--gray);">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 10px;display:block;animation:supaRotate 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin:0 auto 10px;display:block;animation:supaRotate 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
                 <p style="font-size:13px;font-weight:700;">Cargando productos...</p>
               </div>
             </div>
@@ -1958,10 +1957,9 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
           <button class="carousel-nav next" onclick="nextProduct()" aria-label="Siguiente">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
-        </div>
-
-        <div class="carousel-dots" id="productosCarouselDots">
-          <!-- Los dots se insertan por JavaScript -->
+          <div class="carousel-dots" id="productosCarouselDots">
+            <!-- Dots insertados por JavaScript -->
+          </div>
         </div>
 
       </div>
@@ -1971,6 +1969,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
   </div>
 
 </div>
+
 <script>
   function showView(id, navEl){
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -3061,7 +3060,26 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
       '}' +
       'updateCdCount();' +
       '<' + '/script>' +
-      '
+      '</body></html>';
+
+    var win = window.open('', '_blank');
+    if(!win){
+      alert('El navegador bloqueó la ventana emergente. Por favor habilita las ventanas emergentes para ver el listado de clientes.');
+      return;
+    }
+    win.document.open();
+    win.document.write(docHTML);
+    win.document.close();
+  }
+
+  /* ============ MENÚ MÓVIL (RESPONSIVE) ============ */
+  function toggleDropiSidebar(){
+    document.getElementById('dropiSidebar').classList.toggle('mobile-open');
+    document.getElementById('dropiBackdrop').classList.toggle('show');
+  }
+</script>
+
+
 <!-- ============================================================
      MÓDULO SUPABASE v3.0 — 100% Dinámico, sin datos quemados
      VittaStore — Módulo de Recompra & Fidelización
@@ -3405,24 +3423,5 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
 })();
 </script>
 
-</body></html>';
-
-    var win = window.open('', '_blank');
-    if(!win){
-      alert('El navegador bloqueó la ventana emergente. Por favor habilita las ventanas emergentes para ver el listado de clientes.');
-      return;
-    }
-    win.document.open();
-    win.document.write(docHTML);
-    win.document.close();
-  }
-
-  /* ============ MENÚ MÓVIL (RESPONSIVE) ============ */
-  function toggleDropiSidebar(){
-    document.getElementById('dropiSidebar').classList.toggle('mobile-open');
-    document.getElementById('dropiBackdrop').classList.toggle('show');
-  }
-</script>
-
-
+</body>
 </html>
