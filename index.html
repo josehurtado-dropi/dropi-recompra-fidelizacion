@@ -3575,9 +3575,11 @@ window.PRODUCTO_IMGS = {
 };
 </script>
 
+
+
 <!-- ============================================================
-     MÓDULO SUPABASE v3.0 — 100% Dinámico, sin datos quemados
-     VittaStore — Módulo de Recompra & Fidelización
+     MÓDULO SUPABASE v4.0 — Datos reales desde tabla pedidos
+     Módulo de Recompra & Fidelización — VittaStore
      ============================================================ -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
@@ -3585,29 +3587,13 @@ window.PRODUCTO_IMGS = {
   var SUPA_URL = "https://tjfpnvlnqjfjjgjcjizb.supabase.co";
   var SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c";
   var supa = null;
+  var BD = { tienda: null, productos: [], segmentos: {}, plantillas: {}, nombres: [], ciudades: [], currentProductIndex: 0 };
 
-  // ── Estado global cargado desde Supabase ──────────────────
-  var BD = {
-    tienda: null,
-    productos: [],
-    asistentes: [],
-    plantillas: {},
-    segmentos: {},
-    nombres: [],
-    ciudades: [],
-    currentProductIndex: 0
-  };
-
-  // ── Utilidades ─────────────────────────────────────────────
+  // ── Utilidades ────────────────────────────────────────────
   function formatCOP(n) { return n ? '$' + Math.round(n).toLocaleString('es-CO') : '$0'; }
   function formatNum(n) { return n ? Math.round(n).toLocaleString('es-CO') : '0'; }
-  function randInt(a,b) { return Math.floor(Math.random()*(b-a+1))+a; }
-  function randChoice(arr) { return arr[randInt(0,arr.length-1)]; }
-  function randomPhone() { var d="3"+randInt(0,2); for(var i=0;i<8;i++) d+=randInt(0,9); return d; }
-  function pad(n) { return n<10?'0'+n:''+n; }
-  function formatFecha(d) { return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(); }
 
-  // ── Badge de estado ────────────────────────────────────────
+  // ── Badge de conexión ─────────────────────────────────────
   function setBadge(estado) {
     var b = document.getElementById('supa-status-badge');
     if (!b) return;
@@ -3632,172 +3618,201 @@ window.PRODUCTO_IMGS = {
 
   // ── Cargar tienda ─────────────────────────────────────────
   async function cargarTienda() {
-    var { data } = await supa.from('tiendas').select('*').eq('activa',true).limit(1).single();
+    var { data } = await supa.from('tiendas').select('*').eq('activa', true).limit(1).single();
     if (!data) return;
     BD.tienda = data;
-    // Actualizar UI
     var s = document.getElementById('saludo-tienda');
     if (s) s.textContent = '¡Hola, ' + data.nombre + '!';
     var ns = document.getElementById('nombre-tienda-sidebar');
     if (ns) ns.textContent = data.nombre;
     var sc = document.getElementById('saldo-cartera');
     if (sc) sc.textContent = formatCOP(data.saldo_cartera);
-    // Chatea overlay
     var cn = document.getElementById('chatea-nombre-tienda');
     if (cn) cn.textContent = data.nombre;
     var ci = document.getElementById('chatea-id-tienda');
     if (ci) ci.textContent = 'ID: ' + (data.id_chatea || '');
-    // Iniciales avatar
     document.querySelectorAll('.chatea-avatar-circle').forEach(function(el) {
-      el.textContent = data.iniciales || data.nombre.substring(0,2).toUpperCase();
+      el.textContent = data.iniciales || data.nombre.substring(0, 2).toUpperCase();
     });
   }
 
-  // ── Cargar productos ──────────────────────────────────────
+  // ── Cargar productos desde pedidos reales ─────────────────
+  // Agrupa por producto y calcula métricas desde la tabla pedidos
   async function cargarProductos() {
-    var { data } = await supa.from('productos').select('*').eq('activo',true).order('facturacion',{ascending:false});
-    if (!data || !data.length) return;
-    BD.productos = data;
+    if (!supa) return;
+    var hoy = new Date();
+    var hace365 = new Date(hoy); hace365.setDate(hoy.getDate() - 365);
+    var hace365Str = hace365.toISOString().split('T')[0];
+
+    // Traer todos los pedidos del último año del dropshipper autenticado
+    var { data, error } = await supa
+      .from('pedidos')
+      .select('id_producto,nombre_producto,nombre_proveedor,url_foto_producto,valor_orden,costo_proveedor,precio_flete,ganancia,fecha_entrega,nombre_cliente,telefono_cliente,ciudad,departamento')
+      .eq('estado_orden', 'ENTREGADO')
+      .gte('fecha_entrega', hace365Str)
+      .order('fecha_entrega', { ascending: false });
+
+    if (error) { console.error('[Supabase] Error pedidos:', error); return; }
+    if (!data || !data.length) {
+      document.getElementById('productosCarouselTrack').innerHTML =
+        '<div class="prod-card carousel-slide active" style="justify-content:center;align-items:center;min-height:200px;">' +
+        '<p style="color:var(--gray);font-weight:700;font-size:14px;text-align:center;">No hay pedidos registrados.<br>Carga tu información desde Dropi.</p></div>';
+      return;
+    }
+
+    // Agrupar por producto
+    var productosMap = {};
+    data.forEach(function(p) {
+      var id = p.id_producto;
+      if (!productosMap[id]) {
+        productosMap[id] = {
+          id_producto:       id,
+          nombre:            p.nombre_producto,
+          proveedor:         p.nombre_proveedor,
+          imagen_url:        p.url_foto_producto,
+          ordenes:           0,
+          facturacion:       0,
+          ganancias:         0,
+          seg1_clientes:     [], // mes anterior: 1-30 días
+          seg2_clientes:     [], // 2 meses: 31-60 días
+          seg3_clientes:     [], // 3m-1año: 61-365 días
+        };
+      }
+      var prod = productosMap[id];
+      prod.ordenes    += 1;
+      prod.facturacion += parseFloat(p.valor_orden) || 0;
+      prod.ganancias   += parseFloat(p.ganancia) || 0;
+
+      // Calcular días desde entrega
+      var fechaEntrega = new Date(p.fecha_entrega);
+      var diasDesde = Math.floor((hoy - fechaEntrega) / (1000 * 60 * 60 * 24));
+      var cliente = { nombre: p.nombre_cliente, telefono: p.telefono_cliente, ciudad: p.ciudad, departamento: p.departamento };
+
+      if (diasDesde >= 1  && diasDesde <= 30)  prod.seg1_clientes.push(cliente);
+      if (diasDesde >= 31 && diasDesde <= 60)  prod.seg2_clientes.push(cliente);
+      if (diasDesde >= 61 && diasDesde <= 365) prod.seg3_clientes.push(cliente);
+    });
+
+    // Convertir a array y ordenar por órdenes entregadas (mayor a menor)
+    BD.productos = Object.values(productosMap).sort(function(a, b) { return b.ordenes - a.ordenes; });
     BD.currentProductIndex = 0;
+
+    // Guardar los clientes en window para acceso desde generarListado
+    window._productosData = BD.productos;
+
+    // Renderizar carrusel
     var track = document.getElementById('productosCarouselTrack');
     var dots  = document.getElementById('productosCarouselDots');
     if (!track) return;
-    track.innerHTML = data.map(function(p,i) { return renderProductCard(p, i, i===0); }).join('');
-    if (dots) dots.innerHTML = data.map(function(_,i) {
-      return '<span class="carousel-dot'+(i===0?' active':'')+'" data-index="'+i+'" onclick="goToProduct('+i+')"></span>';
+
+    track.innerHTML = BD.productos.map(function(p, i) {
+      return renderProductCard(p, i, i === 0);
     }).join('');
-    // Sincronizar con Chatea PRO
-    actualizarChateaProductos(data);
+
+    if (dots) {
+      dots.innerHTML = BD.productos.map(function(_, i) {
+        return '<span class="carousel-dot' + (i === 0 ? ' active' : '') + '" data-index="' + i + '" onclick="goToProduct(' + i + ')"></span>';
+      }).join('');
+    }
+
+    console.log('[Supabase] ' + BD.productos.length + ' productos cargados desde pedidos reales');
   }
 
-  // ── Renderizar tarjeta de producto ────────────────────────
+  // ── Renderizar tarjeta de producto ─────────────────────────
   function renderProductCard(p, i, active) {
-    var prov = p.provider ? '<div style="font-size:11px;color:var(--gray);margin-bottom:6px;">Provider: <b style="color:#FF7A1A;">'+p.provider+'</b></div>' : '';
     var imgSrc = p.imagen_url || (window.PRODUCTO_IMGS && window.PRODUCTO_IMGS[p.nombre]) || null;
     var img = imgSrc
-      ? '<img src="'+imgSrc+'" alt="'+p.nombre+'" style="width:150px;height:150px;object-fit:contain;flex-shrink:0;border-radius:10px;">'
-      : '<div style="width:150px;height:150px;flex-shrink:0;border-radius:10px;background:#F5F6F8;display:flex;align-items:center;justify-content:center;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>';
-    var segs = BD.segmentos && Object.keys(BD.segmentos).length
-      ? Object.keys(BD.segmentos).map(function(seg) {
-          return '<div class="segment-row"><span class="segment-label">'+seg+'</span><button class="segment-btn" onclick="generarListado(\''+p.nombre.replace(/'/g,"\\'")+"', '"+seg.replace(/'/g,"\\'")+"', this)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/></svg>Ver Listado De Clientes</button></div>";
-        }).join('')
-      : ['Compradores Mes Anterior','Compradores 2 Meses Anteriores','Compradores Desde 3 Hasta 1 Año'].map(function(seg) {
-          return '<div class="segment-row"><span class="segment-label">'+seg+'</span><button class="segment-btn" onclick="generarListado(\''+p.nombre.replace(/'/g,"\\'")+"', '"+seg+"', this)\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/></svg>Ver Listado De Clientes</button></div>";
-        }).join('');
-    return '<div class="prod-card carousel-slide'+(active?' active':'')+'" data-index="'+i+'">'+img+
-      '<div class="prod-body"><div class="prod-meta-row"><span>'+p.categoria+'</span><span>Stock <b>'+formatNum(p.stock)+'</b></span></div>'+
-      '<div class="prod-name">'+p.nombre+'</div>'+prov+
-      '<div class="prod-stat-row"><span>Entregados</span><span><b>'+formatNum(p.ordenes_entregadas)+' órdenes entregadas</b>'+formatCOP(p.facturacion)+'</span></div>'+
-      '<div class="prod-stat-row"><span>Ganancias</span><span><b style="color:#1E8E5A;">'+formatCOP(p.ganancias)+'</b></span></div>'+
-      '</div><div class="prod-accion-col"><div class="prod-segments">'+segs+'</div></div></div>';
+      ? '<img src="' + imgSrc + '" alt="' + p.nombre + '" style="width:150px;height:150px;object-fit:contain;flex-shrink:0;border-radius:10px;" onerror="this.style.display=\'none\'">'
+      : '<div style="width:150px;height:150px;flex-shrink:0;border-radius:10px;background:#F5F6F8;display:flex;align-items:center;justify-content:center;font-size:40px;">📦</div>';
+
+    var prov = p.proveedor
+      ? '<div style="font-size:11px;color:var(--gray);margin-bottom:6px;">Provider: <b style="color:#FF7A1A;">' + p.proveedor + '</b></div>'
+      : '';
+
+    var segmentos = [
+      { label: 'Compradores Mes Anterior',        key: 'seg1_clientes', cnt: p.seg1_clientes.length },
+      { label: 'Compradores 2 Meses Anteriores',  key: 'seg2_clientes', cnt: p.seg2_clientes.length },
+      { label: 'Compradores Desde 3 Hasta 1 Año', key: 'seg3_clientes', cnt: p.seg3_clientes.length },
+    ];
+
+    var segsHtml = segmentos.map(function(seg) {
+      return '<div class="segment-row">' +
+        '<span class="segment-label">' + seg.label + ' <b style="color:#FF7A1A;">(' + seg.cnt + ')</b></span>' +
+        '<button class="segment-btn" onclick="generarListado(\'' + p.nombre.replace(/'/g, "\\'") + "', '" + seg.label.replace(/'/g, "\\'") + "', this)\">" +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>' +
+        'Ver Listado De Clientes</button></div>';
+    }).join('');
+
+    return '<div class="prod-card carousel-slide' + (active ? ' active' : '') + '" data-index="' + i + '">' +
+      img +
+      '<div class="prod-body">' +
+        '<div class="prod-meta-row"><span>Producto</span><span>Órdenes <b>' + formatNum(p.ordenes) + '</b></span></div>' +
+        '<div class="prod-name">' + p.nombre + '</div>' +
+        prov +
+        '<div class="prod-stat-row"><span>Entregados</span><span><b>' + formatNum(p.ordenes) + ' órdenes entregadas</b> ' + formatCOP(p.facturacion) + '</span></div>' +
+        '<div class="prod-stat-row"><span>Ganancias</span><span><b style="color:#1E8E5A;">' + formatCOP(p.ganancias) + '</b></span></div>' +
+      '</div>' +
+      '<div class="prod-accion-col"><div class="prod-segments">' + segsHtml + '</div></div>' +
+    '</div>';
   }
 
-  // ── Cargar asistentes (Chatea PRO) ────────────────────────
+  // ── Cargar asistentes ─────────────────────────────────────
   async function cargarAsistentes() {
-    var { data } = await supa.from('asistentes').select('*').eq('activo',true).order('orden');
+    var { data } = await supa.from('asistentes').select('*').eq('activo', true).order('orden');
     if (!data) return;
-    BD.asistentes = data;
     var grid = document.querySelector('.chatea-team-grid');
     if (!grid) return;
     grid.innerHTML = data.map(function(a) {
-      var initials = a.nombre.substring(0,2).toUpperCase();
+      var init = a.nombre.substring(0, 2).toUpperCase();
       return '<div class="chatea-team-card enabled">' +
-        '<div class="chatea-team-photo" style="display:flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#FF7A1A,#FF8F3D);color:#fff;font-size:22px;font-weight:800;flex-shrink:0;">'+initials+'</div>' +
-        '<div class="chatea-team-body">' +
-          '<div class="chatea-team-name">'+a.nombre+'</div>' +
-          '<div class="chatea-team-role">'+a.rol+'</div>' +
-          '<div class="chatea-team-desc">'+a.descripcion+'</div>' +
-        '</div>' +
+        '<div class="chatea-team-photo" style="display:flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#FF7A1A,#FF8F3D);color:#fff;font-size:22px;font-weight:800;flex-shrink:0;">' + init + '</div>' +
+        '<div class="chatea-team-body"><div class="chatea-team-name">' + a.nombre + '</div>' +
+        '<div class="chatea-team-role">' + a.rol + '</div>' +
+        '<div class="chatea-team-desc">' + a.descripcion + '</div></div>' +
         '<div class="chatea-team-actions"><button class="chatea-team-btn enabled-btn">Instalado</button></div>' +
-      '</div>';
+        '</div>';
     }).join('');
   }
 
-  // ── Cargar plantillas de mensaje ──────────────────────────
+  // ── Cargar plantillas ─────────────────────────────────────
   async function cargarPlantillas() {
-    var { data } = await supa.from('plantillas_mensaje').select('*').eq('activo',true);
+    var { data } = await supa.from('plantillas_mensaje').select('*').eq('activo', true);
     if (!data) return;
     data.forEach(function(p) {
       BD.plantillas[p.tipo] = p.texto;
-      BD.plantillas[p.tipo.replace('_',' ')] = p.texto; // alias sin guión bajo
+      BD.plantillas[p.tipo.replace('_', ' ')] = p.texto;
     });
-    // Actualizar PLANTILLAS_MSG_CONFIG en el contexto de las ventanas emergentes
     window._PLANTILLAS_SUPA = BD.plantillas;
   }
 
   // ── Cargar segmentos ──────────────────────────────────────
   async function cargarSegmentos() {
-    var { data } = await supa.from('segmentos').select('*').eq('activo',true).order('orden');
+    var { data } = await supa.from('segmentos').select('*').eq('activo', true).order('orden');
     if (!data) return;
     data.forEach(function(s) { BD.segmentos[s.nombre] = [s.dias_min, s.dias_max]; });
-    // Sobrescribir SEGMENT_RANGOS global
     window.SEGMENT_RANGOS = BD.segmentos;
   }
 
-  // ── Cargar pool de nombres y ciudades ─────────────────────
+  // ── Cargar nombres y ciudades demo ────────────────────────
   async function cargarNombresCiudades() {
     var [rN, rC] = await Promise.all([
-      supa.from('nombres_demo').select('nombre').eq('tipo','persona'),
+      supa.from('nombres_demo').select('nombre').eq('tipo', 'persona'),
       supa.from('ciudades_demo').select('departamento,ciudad')
     ]);
-    if (rN.data) {
-      BD.nombres = rN.data.map(function(x){return x.nombre;});
-      window.NOMBRES_POOL = BD.nombres;
-    }
-    if (rC.data) {
-      BD.ciudades = rC.data.map(function(x){return [x.departamento, x.ciudad];});
-      window.CIUDADES_POOL = BD.ciudades;
-    }
-  }
-
-  // ── Actualizar productos en Chatea PRO ────────────────────
-  function actualizarChateaProductos(productos) {
-    ['chateaProdRecompraGrid','chateaProdVentaCruzadaGrid'].forEach(function(gridId) {
-      var grid = document.getElementById(gridId);
-      if (!grid) return;
-      var addCard = grid.querySelector('.chatea-prod-add-card');
-      var cards = productos.map(function(p) {
-        return '<div class="chatea-prod-card">' +
-          '<div class="chatea-prod-img-wrap">' +
-            (p.imagen_url ? '<img src="'+p.imagen_url+'" alt="'+p.nombre+'" style="width:100%;height:80px;object-fit:contain;">' :
-              '<div style="width:100%;height:80px;background:#F5F6F8;display:flex;align-items:center;justify-content:center;font-size:28px;">📦</div>') +
-            '<div class="chatea-prod-icon-actions"><div class="chatea-prod-icon-btn">📋</div><div class="chatea-prod-icon-btn">🗑️</div></div>' +
-          '</div>' +
-          '<div class="chatea-prod-body">' +
-            '<div class="chatea-prod-name">'+p.nombre+'</div>' +
-            '<div class="chatea-prod-meta-row"><span class="chatea-prod-status-inactive">'+p.categoria+'</span><span class="chatea-prod-type">físico</span></div>' +
-            '<div class="chatea-prod-price-row"><span>'+formatNum(p.ordenes_entregadas)+' entregados</span></div>' +
-            '<button class="chatea-prod-configure-btn" onclick="abrirConfigAsistente()">Configurar</button>' +
-          '</div></div>';
-      }).join('');
-      grid.innerHTML = (addCard ? addCard.outerHTML : '') + cards;
-    });
-  }
-
-  // ── Registrar clientes ────────────────────────────────────
-  async function registrarClientes(producto, segmento, filas) {
-    if (!supa) return;
-    try {
-      var tiendaNombre = BD.tienda ? BD.tienda.nombre : 'VittaStore';
-      var registros = filas.map(function(f) {
-        return { nombre:f.nombre||'Sin nombre', telefono:f.telefono||'', ciudad:f.ciudad||'',
-          departamento:f.departamento||'', producto:producto, fecha_compra:f.fecha||new Date().toISOString().split('T')[0],
-          estado_orden:'ENTREGADO CON RECAUDO', flete:parseFloat(f.flete)||0, tienda:tiendaNombre };
-      });
-      await supa.from('clientes').upsert(registros, {onConflict:'telefono,producto'});
-    } catch(e) { console.error('[Supabase] Error clientes:', e); }
+    if (rN.data) { BD.nombres = rN.data.map(function(x) { return x.nombre; }); window.NOMBRES_POOL = BD.nombres; }
+    if (rC.data) { BD.ciudades = rC.data.map(function(x) { return [x.departamento, x.ciudad]; }); window.CIUDADES_POOL = BD.ciudades; }
   }
 
   // ── Registrar campaña ─────────────────────────────────────
   async function registrarCampana(tipo, productoOrigen, segmento, mensaje) {
     if (!supa) return null;
     try {
-      var tiendaNombre = BD.tienda ? BD.tienda.nombre : 'VittaStore';
+      var tienda = BD.tienda ? BD.tienda.nombre : 'VittaStore';
       var { data } = await supa.from('campanas').insert({
-        nombre: tipo+' — '+productoOrigen+' ('+new Date().toLocaleDateString('es-CO')+')',
+        nombre: tipo + ' — ' + productoOrigen + ' (' + new Date().toLocaleDateString('es-CO') + ')',
         tipo: tipo === 'VENTA CRUZADA' ? 'VENTA_CRUZADA' : 'RECOMPRA',
-        producto_origen: productoOrigen, segmento: segmento||'General',
-        mensaje_base: mensaje||'', estado:'ACTIVA', tienda: tiendaNombre
+        producto_origen: productoOrigen, segmento: segmento || 'General',
+        mensaje_base: mensaje || '', estado: 'ACTIVA', tienda: tienda
       }).select().single();
       return data;
     } catch(e) { console.error('[Supabase] Error campaña:', e); return null; }
@@ -3808,41 +3823,64 @@ window.PRODUCTO_IMGS = {
     if (!supa || !campanaId || !telefonos.length) return;
     try {
       await supa.from('envios').insert(
-        telefonos.map(function(tel) { return {campana_id:campanaId, telefono:tel, estado:'ENVIADO', canal:'WHATSAPP'}; })
+        telefonos.map(function(tel) { return { campana_id: campanaId, telefono: tel, estado: 'ENVIADO', canal: 'WHATSAPP' }; })
       );
     } catch(e) { console.error('[Supabase] Error envíos:', e); }
   }
 
-  // ── Estado global de campaña ──────────────────────────────
-  window._campanaActiva = { tipo:'RECOMPRA', productoOrigen:'', segmento:'', telefonos:[] };
+  // ── Parche sobre generarListado para usar datos reales ────
+  // Inyecta los clientes reales de Supabase en la ventana emergente
+  window._campanaActiva = { tipo: 'RECOMPRA', productoOrigen: '', segmento: '', clientes: [] };
 
-  // ── Parches sobre funciones existentes ────────────────────
   function aplicarParches() {
-    // generarListado — usar segmentos de BD
-    if (typeof window.generarListado === 'function' && !window.generarListado._v3) {
+    // Parche generarListado — usa clientes reales de BD
+    if (typeof window.generarListado === 'function' && !window.generarListado._v4) {
       var _orig = window.generarListado;
       window.generarListado = function(producto, segmento, btnEl) {
         window._campanaActiva.productoOrigen = producto;
         window._campanaActiva.segmento = segmento;
-        // Usar SEGMENT_RANGOS de BD si está disponible
-        if (BD.segmentos && Object.keys(BD.segmentos).length) {
+
+        // Buscar el producto en los datos reales
+        var prodData = (window._productosData || []).find(function(p) { return p.nombre === producto; });
+        if (prodData) {
+          // Determinar qué lista de clientes usar según el segmento
+          var clientesReales = [];
+          if (segmento.indexOf('Mes Anterior') >= 0 || segmento.indexOf('Compradores Mes') >= 0) {
+            clientesReales = prodData.seg1_clientes;
+          } else if (segmento.indexOf('2 Meses') >= 0) {
+            clientesReales = prodData.seg2_clientes;
+          } else if (segmento.indexOf('3') >= 0 || segmento.indexOf('Año') >= 0) {
+            clientesReales = prodData.seg3_clientes;
+          }
+          window._campanaActiva.clientes = clientesReales;
+          // Inyectar en los pools globales para que generarListado los use
+          if (clientesReales.length > 0) {
+            window.NOMBRES_POOL = clientesReales.map(function(c) { return c.nombre; });
+            window.CIUDADES_POOL = clientesReales.map(function(c) { return [c.departamento || 'COLOMBIA', c.ciudad || '']; });
+            window._TELEFONOS_REALES = clientesReales.map(function(c) { return c.telefono; });
+          }
+        }
+
+        if (window.SEGMENT_RANGOS && Object.keys(window.SEGMENT_RANGOS).length) {
           window.SEGMENT_RANGOS = BD.segmentos;
         }
         return _orig.apply(this, arguments);
       };
-      window.generarListado._v3 = true;
+      window.generarListado._v4 = true;
     }
-    // selectAccion
-    if (typeof window.selectAccion === 'function' && !window.selectAccion._v3) {
+
+    // Parche selectAccion
+    if (typeof window.selectAccion === 'function' && !window.selectAccion._v4) {
       var _origSA = window.selectAccion;
       window.selectAccion = function(tipo) {
         window._campanaActiva.tipo = tipo;
         return _origSA.apply(this, arguments);
       };
-      window.selectAccion._v3 = true;
+      window.selectAccion._v4 = true;
     }
-    // enviarMensaje
-    if (typeof window.enviarMensaje === 'function' && !window.enviarMensaje._v3) {
+
+    // Parche enviarMensaje — registra en Supabase
+    if (typeof window.enviarMensaje === 'function' && !window.enviarMensaje._v4) {
       var _origEM = window.enviarMensaje;
       window.enviarMensaje = async function() {
         var ta = document.getElementById('msgTextarea');
@@ -3850,7 +3888,7 @@ window.PRODUCTO_IMGS = {
         var tels = [];
         document.querySelectorAll('#cdTableBody tr').forEach(function(row) {
           var chk = row.querySelector('.cd-row-check');
-          if (chk && chk.checked) { var tds=row.querySelectorAll('td'); if(tds[2]) tels.push(tds[2].textContent.trim()); }
+          if (chk && chk.checked) { var tds = row.querySelectorAll('td'); if (tds[2]) tels.push(tds[2].textContent.trim()); }
         });
         var ca = window._campanaActiva;
         registrarCampana(ca.tipo, ca.productoOrigen, ca.segmento, msg).then(function(camp) {
@@ -3858,74 +3896,63 @@ window.PRODUCTO_IMGS = {
         });
         return _origEM.apply(this, arguments);
       };
-      window.enviarMensaje._v3 = true;
+      window.enviarMensaje._v4 = true;
     }
-    // guardarListaClientes
-    if (typeof window.guardarListaClientes === 'function' && !window.guardarListaClientes._v3) {
-      var _origGL = window.guardarListaClientes;
-      window.guardarListaClientes = function(irAMensaje) {
-        var ca = window._campanaActiva;
-        if (ca.productoOrigen) {
-          var filas = [];
-          document.querySelectorAll('#cdTableBody tr').forEach(function(row) {
-            var tds = row.querySelectorAll('td');
-            if (tds.length >= 8) filas.push({nombre:tds[1]?tds[1].textContent.trim():'', telefono:tds[2]?tds[2].textContent.trim():'', departamento:tds[6]?tds[6].textContent.trim():'', ciudad:tds[7]?tds[7].textContent.trim():''});
-          });
-          registrarClientes(ca.productoOrigen, ca.segmento, filas);
-        }
-        return _origGL.apply(this, arguments);
-      };
-      window.guardarListaClientes._v3 = true;
-    }
+
     // Inyectar plantillas en ventanas emergentes
     if (window._PLANTILLAS_SUPA && Object.keys(window._PLANTILLAS_SUPA).length) {
       window.PLANTILLAS_MSG_CONFIG = window._PLANTILLAS_SUPA;
     }
-    // Inyectar nombre de tienda en plantillas de ventana emergente
-    if (BD.tienda) {
-      window._TIENDA_NOMBRE = BD.tienda.nombre;
-    }
+    if (BD.tienda) { window._TIENDA_NOMBRE = BD.tienda.nombre; }
   }
 
-  // ── CSS animación carga ───────────────────────────────────
+  // ── Callback de login exitoso ─────────────────────────────
+  window.onLoginExitoso = async function(user) {
+    console.log('[Login] Autenticado:', user.email);
+    window._usuarioActual = user;
+    try {
+      await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades()]);
+      await Promise.all([cargarProductos(), cargarAsistentes()]);
+      setTimeout(aplicarParches, 500);
+      setInterval(aplicarParches, 2500);
+    } catch(e) {
+      console.error('[Supabase] Error cargando datos post-login:', e);
+    }
+  };
+
+  // ── CSS animación ─────────────────────────────────────────
   var st = document.createElement('style');
   st.textContent = '@keyframes supaRotate{to{transform:rotate(360deg)}}';
   document.head.appendChild(st);
 
-  // ── Init principal ────────────────────────────────────────
+  // ── Init ──────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', async function() {
     crearBadge();
     try {
       supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
-      setBadge('ok');
-      // Cargar todo en paralelo
-      await Promise.all([
-        cargarTienda(),
-        cargarSegmentos(),
-        cargarPlantillas(),
-        cargarNombresCiudades()
-      ]);
-      // Luego productos y asistentes
-      await Promise.all([cargarProductos(), cargarAsistentes()]);
-      // Aplicar parches después de cargar
-      setTimeout(aplicarParches, 500);
-      setInterval(aplicarParches, 2500);
+      // Verificar si ya hay sesión activa (usuario ya logueado)
+      var { data: { session } } = await supa.auth.getSession();
+      if (session && session.user) {
+        console.log('[Supabase] Sesión activa encontrada:', session.user.email);
+        setBadge('ok');
+        // Ocultar login si está visible
+        var loginScreen = document.getElementById('loginScreen');
+        if (loginScreen) loginScreen.classList.remove('visible');
+        // Cargar datos
+        window._usuarioActual = session.user;
+        await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades()]);
+        await Promise.all([cargarProductos(), cargarAsistentes()]);
+        setTimeout(aplicarParches, 500);
+        setInterval(aplicarParches, 2500);
+      } else {
+        setBadge('ok');
+        console.log('[Supabase] Esperando login...');
+      }
     } catch(e) {
       setBadge('error');
       console.error('[Supabase] Error init:', e);
     }
   });
-
-
-  // ── Callback de login exitoso ─────────────────────────────
-  window.onLoginExitoso = async function(user) {
-    console.log('[Login] Usuario autenticado:', user.email);
-    window._usuarioActual = user;
-    if (supa) {
-      await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades()]);
-      await Promise.all([cargarProductos(), cargarAsistentes()]);
-    }
-  };
 
 })();
 </script>
