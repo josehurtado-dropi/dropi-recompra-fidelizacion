@@ -3480,11 +3480,11 @@ document.addEventListener('DOMContentLoaded', function() {
           'return;' +
         '}' +
         'var productoSlug = "' + producto.replace(/[^a-zA-Z0-9]+/g, "_") + '";' +
-        'var accionSlug = accionSeleccionada ? accionSeleccionada.replace(/[^a-zA-Z0-9]+/g, "_") + "_" : "";' +
+        'var accionSlug = accionSeleccionada ? accionSeleccionada.replace(/[^a-zA-Z0-9\\s]+/g, "").trim().replace(/\\s+/g, "_") : "Sin_Accion";' +
+        'var segmentoSlug = "' + segmento.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\\s]+/g, "").trim().replace(/\\s+/g, "_") + '";' +
         'var now = new Date();' +
         'var fecha = now.getFullYear() + "-" + padN(now.getMonth()+1) + "-" + padN(now.getDate());' +
-        'var hora = padN(now.getHours()) + "-" + padN(now.getMinutes());' +
-        'var fileName = accionSlug + productoSlug + "_" + fecha + "_" + hora + ".xlsx";' +
+        'var fileName = productoSlug + "_" + accionSlug + "_" + segmentoSlug + "_" + fecha + ".xlsx";' +
         'var folder = accionSeleccionada ? ("Campaña de " + (accionSeleccionada === "VENTA CRUZADA" ? "Venta Cruzada" : "Recompra")) : "Listas de Clientes";' +
         'var overlay = document.getElementById("saveToastOverlay");' +
         'var box = document.getElementById("saveToastBox");' +
