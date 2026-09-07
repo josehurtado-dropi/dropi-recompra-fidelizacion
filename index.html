@@ -3655,9 +3655,25 @@ window.PRODUCTO_IMGS = {
 
     if (error) { console.error('[Supabase] Error pedidos:', error); return; }
     if (!data || !data.length) {
-      document.getElementById('productosCarouselTrack').innerHTML =
-        '<div class="prod-card carousel-slide active" style="justify-content:center;align-items:center;min-height:200px;">' +
-        '<p style="color:var(--gray);font-weight:700;font-size:14px;text-align:center;">No hay pedidos registrados.<br>Carga tu información desde Dropi.</p></div>';
+      var track = document.getElementById('productosCarouselTrack');
+      if (track) track.innerHTML =
+        '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+        'min-height:260px;padding:2rem;text-align:center;">' +
+          '<div style="width:72px;height:72px;border-radius:50%;background:#FFF3E8;' +
+          'display:flex;align-items:center;justify-content:center;margin-bottom:1rem;">' +
+            '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#F27B21" ' +
+            'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>' +
+            '<polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>' +
+            '</svg>' +
+          '</div>' +
+          '<h3 style="font-size:16px;font-weight:800;color:#1B1D23;margin:0 0 8px;">Aún no tienes información cargada</h3>' +
+          '<p style="font-size:13px;color:#6B7280;margin:0;line-height:1.6;">' +
+          'Pronto verás tus productos y clientes aquí.</p>' +
+        '</div>';
+      // Limpiar los dots también
+      var dots = document.getElementById('productosCarouselDots');
+      if (dots) dots.innerHTML = '';
       return;
     }
 
@@ -3935,22 +3951,11 @@ window.PRODUCTO_IMGS = {
     }
   };
 
-  // ── Verificar que el usuario está autorizado ─────────────────
+  // ── Verificar usuario (abierto — cualquiera puede entrar) ──────
+  // La seguridad real está en los datos:
+  // si no hay pedidos para ese correo, no se muestra nada.
   async function verificarDropshipper(userId) {
-    var { data, error } = await supa
-      .from('dropshippers')
-      .select('id, nombre, email, activo')
-      .eq('id', userId)
-      .eq('activo', true)
-      .single();
-    if (error || !data) {
-      console.warn('[Supabase] Usuario no autorizado como Dropshipper');
-      await supa.auth.signOut();
-      var loginScreen = document.getElementById('loginScreen');
-      if (loginScreen) loginScreen.classList.add('visible');
-      return false;
-    }
-    console.log('[Supabase] Dropshipper autorizado:', data.nombre);
+    console.log('[Supabase] Usuario autenticado, cargando sus datos...');
     return true;
   }
 
