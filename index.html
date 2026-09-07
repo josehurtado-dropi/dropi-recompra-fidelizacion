@@ -3864,6 +3864,7 @@ window.PRODUCTO_IMGS = {
       window.generarListado = function(producto, segmento, btnEl) {
         window._campanaActiva.productoOrigen = producto;
         window._campanaActiva.segmento = segmento;
+        window._accionExplicita = false;
 
         // Buscar el producto en los datos reales
         var prodData = (window._productosData || []).find(function(p) { return p.nombre === producto; });
@@ -3923,6 +3924,12 @@ window.PRODUCTO_IMGS = {
           providerHTML = '<div style="font-size:12px;color:#6B7280;">Provider: <b style="color:#FF7A1A;">' + prodData.proveedor + '</b></div>';
         }
 
+        // Validar que se haya seleccionado una accion antes de abrir la ventana
+        if (!window._accionExplicita) {
+          alert('Debes seleccionar una Accion antes de ver el listado.\nSelecciona Recompra o Venta Cruzada.');
+          return;
+        }
+
         // Llamar directamente a abrirVentanaListado con datos reales
         abrirVentanaListado(producto, segmento, rows, clientesReales.length, imgSrc, categoria, providerHTML);
       };
@@ -3934,6 +3941,7 @@ window.PRODUCTO_IMGS = {
       var _origSA = window.selectAccion;
       window.selectAccion = function(tipo) {
         window._campanaActiva.tipo = tipo;
+        window._accionExplicita = true;
         return _origSA.apply(this, arguments);
       };
       window.selectAccion._v4 = true;
