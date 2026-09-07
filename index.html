@@ -3648,7 +3648,7 @@ window.PRODUCTO_IMGS = {
     // Traer todos los pedidos del último año del dropshipper autenticado
     var { data, error } = await supa
       .from('pedidos')
-      .select('id_producto,nombre_producto,nombre_proveedor,url_foto_producto,valor_orden,costo_proveedor,precio_flete,ganancia,fecha_entrega,nombre_cliente,telefono_cliente,ciudad,departamento')
+      .select('id_producto,nombre_producto,nombre_proveedor,url_foto_producto,valor_orden,costo_proveedor,precio_flete,ganancia,fecha_entrega,nombre_cliente,telefono_cliente,ciudad,departamento,transportadora,tipo_envio')
       .eq('estado_orden', 'ENTREGADO')
       .gte('fecha_entrega', hace365Str)
       .order('fecha_entrega', { ascending: false });
@@ -3703,7 +3703,16 @@ window.PRODUCTO_IMGS = {
       // Calcular días desde entrega
       var fechaEntrega = new Date(p.fecha_entrega);
       var diasDesde = Math.floor((hoy - fechaEntrega) / (1000 * 60 * 60 * 24));
-      var cliente = { nombre: p.nombre_cliente, telefono: p.telefono_cliente, ciudad: p.ciudad, departamento: p.departamento };
+      var cliente = {
+              nombre:        p.nombre_cliente,
+              telefono:      p.telefono_cliente,
+              ciudad:        p.ciudad,
+              departamento:  p.departamento,
+              transportadora: p.transportadora,
+              tipo_envio:    p.tipo_envio,
+              precio_flete:  p.precio_flete,
+              fecha_entrega: p.fecha_entrega
+            };
 
       if (diasDesde >= 1  && diasDesde <= 30)  prod.seg1_clientes.push(cliente);
       if (diasDesde >= 31 && diasDesde <= 60)  prod.seg2_clientes.push(cliente);
@@ -3850,38 +3859,72 @@ window.PRODUCTO_IMGS = {
   window._campanaActiva = { tipo: 'RECOMPRA', productoOrigen: '', segmento: '', clientes: [] };
 
   function aplicarParches() {
-    // Parche generarListado — usa clientes reales de BD
+    // Parche generarListado — construye filas con datos REALES de Supabase
     if (typeof window.generarListado === 'function' && !window.generarListado._v4) {
-      var _orig = window.generarListado;
       window.generarListado = function(producto, segmento, btnEl) {
         window._campanaActiva.productoOrigen = producto;
         window._campanaActiva.segmento = segmento;
 
         // Buscar el producto en los datos reales
         var prodData = (window._productosData || []).find(function(p) { return p.nombre === producto; });
-        if (prodData) {
-          // Determinar qué lista de clientes usar según el segmento
-          var clientesReales = [];
-          if (segmento.indexOf('Mes Anterior') >= 0 || segmento.indexOf('Compradores Mes') >= 0) {
-            clientesReales = prodData.seg1_clientes;
-          } else if (segmento.indexOf('2 Meses') >= 0) {
-            clientesReales = prodData.seg2_clientes;
-          } else if (segmento.indexOf('3') >= 0 || segmento.indexOf('Año') >= 0) {
-            clientesReales = prodData.seg3_clientes;
-          }
-          window._campanaActiva.clientes = clientesReales;
-          // Inyectar en los pools globales para que generarListado los use
-          if (clientesReales.length > 0) {
-            window.NOMBRES_POOL = clientesReales.map(function(c) { return c.nombre; });
-            window.CIUDADES_POOL = clientesReales.map(function(c) { return [c.departamento || 'COLOMBIA', c.ciudad || '']; });
-            window._TELEFONOS_REALES = clientesReales.map(function(c) { return c.telefono; });
-          }
+
+        // Si no hay datos reales, mostrar mensaje
+        if (!prodData) {
+          alert('No se encontraron datos para este producto. Por favor recarga el módulo.');
+          return;
         }
 
-        if (window.SEGMENT_RANGOS && Object.keys(window.SEGMENT_RANGOS).length) {
-          window.SEGMENT_RANGOS = BD.segmentos;
+        // Determinar qué segmento usar
+        var clientesReales = [];
+        if (segmento.indexOf('Mes Anterior') >= 0) {
+          clientesReales = prodData.seg1_clientes;
+        } else if (segmento.indexOf('2 Meses') >= 0) {
+          clientesReales = prodData.seg2_clientes;
+        } else {
+          clientesReales = prodData.seg3_clientes;
         }
-        return _orig.apply(this, arguments);
+        window._campanaActiva.clientes = clientesReales;
+
+        // Construir filas con datos REALES (sin aleatorios)
+        var rows = '';
+        clientesReales.forEach(function(c) {
+          rows += '<tr>' +
+            '<td><input type="checkbox" class="cd-checkbox cd-row-check" checked onclick="updateCdCount()"></td>' +
+            '<td>' + (c.nombre || '') + '</td>' +
+            '<td>' + (c.telefono || '') + '</td>' +
+            '<td><span class="status-pill">ENTREGADO</span></td>' +
+            '<td>' + (c.tipo_envio || 'NORMAL') + '</td>' +
+            '<td><b style="color:#26272B;">' + (c.precio_flete ? '$' + Math.round(c.precio_flete).toLocaleString('es-CO') : '$0') + '</b></td>' +
+            '<td>' + (c.departamento || '') + '</td>' +
+            '<td>' + (c.ciudad || '') + '</td>' +
+            '<td>' + (c.transportadora || '') + '</td>' +
+            '<td>' + producto + '</td>' +
+            '<td>' + (c.fecha_entrega ? c.fecha_entrega.split('-').reverse().join('/') : '') + '</td>' +
+          '</tr>';
+        });
+
+        // Extraer imagen y proveedor desde la tarjeta del carrusel
+        var imgSrc = '', categoria = 'Producto', providerHTML = '';
+        var card = btnEl ? btnEl.closest('.prod-card') : null;
+        if (card) {
+          var imgEl = card.querySelector('img');
+          if (imgEl) imgSrc = imgEl.src;
+          // Usar imagen de respaldo si no carga
+          if (!imgSrc && window.PRODUCTO_IMGS && window.PRODUCTO_IMGS[producto]) {
+            imgSrc = window.PRODUCTO_IMGS[producto];
+          }
+          var provDiv = card.querySelector('[style*="color:#FF7A1A"]');
+          if (provDiv) providerHTML = '<div style="font-size:12px;color:#6B7280;">Provider: <b style="color:#FF7A1A;">' + prodData.proveedor + '</b></div>';
+        }
+        if (!imgSrc && window.PRODUCTO_IMGS && window.PRODUCTO_IMGS[producto]) {
+          imgSrc = window.PRODUCTO_IMGS[producto];
+        }
+        if (prodData.proveedor) {
+          providerHTML = '<div style="font-size:12px;color:#6B7280;">Provider: <b style="color:#FF7A1A;">' + prodData.proveedor + '</b></div>';
+        }
+
+        // Llamar directamente a abrirVentanaListado con datos reales
+        abrirVentanaListado(producto, segmento, rows, clientesReales.length, imgSrc, categoria, providerHTML);
       };
       window.generarListado._v4 = true;
     }
