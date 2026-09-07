@@ -2358,7 +2358,8 @@ document.addEventListener('DOMContentLoaded', function() {
         <svg class="wallet-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
         <span id="saldo-cartera">$ 27.924.380</span>
       </div>
-    </div>
+    
+      <button id="btnCerrarSesion" onclick="cerrarSesion()" title="Cerrar sesión" style="display:none;align-items:center;gap:6px;background:#FEF2F2;color:#DC2626;border:1.5px solid #FECACA;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;margin-left:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Cerrar sesión</button></div>
 
     <div class="content">
       <div class="view active" id="view-home">
@@ -3906,11 +3907,68 @@ window.PRODUCTO_IMGS = {
     if (BD.tienda) { window._TIENDA_NOMBRE = BD.tienda.nombre; }
   }
 
+  // ── Cerrar sesión ───────────────────────────────────────────
+  window.cerrarSesion = async function() {
+    if (!confirm('¿Estás seguro que deseas cerrar sesión?')) return;
+    try {
+      await supa.auth.signOut();
+      // Limpiar datos en memoria
+      window._usuarioActual = null;
+      window._productosData = null;
+      BD.productos = [];
+      // Mostrar pantalla de login
+      var loginScreen = document.getElementById('loginScreen');
+      if (loginScreen) {
+        loginScreen.classList.add('visible');
+        // Limpiar campos del login
+        var emailInp = document.getElementById('loginEmail');
+        var passInp  = document.getElementById('loginPassword');
+        if (emailInp) emailInp.value = '';
+        if (passInp)  passInp.value  = '';
+      }
+      // Ocultar botón cerrar sesión
+      var btnLogout = document.getElementById('btnCerrarSesion');
+      if (btnLogout) btnLogout.style.display = 'none';
+      console.log('[Supabase] Sesión cerrada');
+    } catch(e) {
+      console.error('[Supabase] Error al cerrar sesión:', e);
+    }
+  };
+
+  // ── Verificar que el usuario está autorizado ─────────────────
+  async function verificarDropshipper(userId) {
+    var { data, error } = await supa
+      .from('dropshippers')
+      .select('id, nombre, email, activo')
+      .eq('id', userId)
+      .eq('activo', true)
+      .single();
+    if (error || !data) {
+      console.warn('[Supabase] Usuario no autorizado como Dropshipper');
+      await supa.auth.signOut();
+      var loginScreen = document.getElementById('loginScreen');
+      if (loginScreen) loginScreen.classList.add('visible');
+      return false;
+    }
+    console.log('[Supabase] Dropshipper autorizado:', data.nombre);
+    return true;
+  }
+
+  // ── Mostrar botón cerrar sesión ──────────────────────────────
+  function mostrarBtnLogout() {
+    var btn = document.getElementById('btnCerrarSesion');
+    if (btn) btn.style.display = 'inline-flex';
+  }
+
   // ── Callback de login exitoso ─────────────────────────────
   window.onLoginExitoso = async function(user) {
     console.log('[Login] Autenticado:', user.email);
     window._usuarioActual = user;
     try {
+      // Verificar que está autorizado como Dropshipper
+      var autorizado = await verificarDropshipper(user.id);
+      if (!autorizado) return;
+      mostrarBtnLogout();
       await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades()]);
       await Promise.all([cargarProductos(), cargarAsistentes()]);
       setTimeout(aplicarParches, 500);
@@ -3939,6 +3997,10 @@ window.PRODUCTO_IMGS = {
         var loginScreen = document.getElementById('loginScreen');
         if (loginScreen) loginScreen.classList.remove('visible');
         // Cargar datos
+        // Verificar que está autorizado como Dropshipper
+        var autorizado = await verificarDropshipper(session.user.id);
+        if (!autorizado) return;
+        mostrarBtnLogout();
         window._usuarioActual = session.user;
         await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades()]);
         await Promise.all([cargarProductos(), cargarAsistentes()]);
