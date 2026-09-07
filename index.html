@@ -3555,6 +3555,24 @@ document.addEventListener('DOMContentLoaded', function() {
     win.document.open();
     win.document.write(docHTML);
     win.document.close();
+
+    // Inyectar validacion de accion y nombre correcto DESPUES de escribir la ventana
+    setTimeout(function() {
+      try {
+        var winDoc = win.document;
+        var origGuardar = win.guardarListaClientes;
+        win.guardarListaClientes = function(irAMensaje) {
+          var accion = win.accionSeleccionada;
+          if (!accion) {
+            win.alert('Debes seleccionar una Accion antes de generar el archivo.\nSelecciona RECOMPRA o VENTA CRUZADA en el filtro de Acciones.');
+            return;
+          }
+          origGuardar.call(win, irAMensaje);
+        };
+      } catch(e) {
+        console.log('Patch ventana:', e);
+      }
+    }, 800);
   }
 
   /* ============ MENÚ MÓVIL (RESPONSIVE) ============ */
@@ -3922,12 +3940,6 @@ window.PRODUCTO_IMGS = {
         }
         if (prodData.proveedor) {
           providerHTML = '<div style="font-size:12px;color:#6B7280;">Provider: <b style="color:#FF7A1A;">' + prodData.proveedor + '</b></div>';
-        }
-
-        // Validar que se haya seleccionado una accion antes de abrir la ventana
-        if (!window._accionExplicita) {
-          alert('Debes seleccionar una Accion antes de ver el listado.\nSelecciona Recompra o Venta Cruzada.');
-          return;
         }
 
         // Llamar directamente a abrirVentanaListado con datos reales
