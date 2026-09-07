@@ -2,9 +2,6 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dropi — Módulo de Recompra & Fidelización (Mockup)</title>
 <style>
@@ -3477,18 +3474,14 @@ document.addEventListener('DOMContentLoaded', function() {
           'alert("Selecciona al menos un cliente de la lista antes de generar y guardar el archivo.");' +
           'return;' +
         '}' +
-        'if(!accionSeleccionada){' +
-          'alert("⚠️ Debes seleccionar una acción antes de generar el archivo.\n\nSelecciona Recompra o Venta Cruzada en el selector de Acciones.");' +
-          'return;' +
-        '}' +
         'var XLSXref = window.XLSX || (window.opener && window.opener.XLSX) || null;' +
         'if(!XLSXref){' +
           'document.getElementById("noXlsxMsg").style.display = "block";' +
           'return;' +
         '}' +
-        'var productoSlug = producto.replace(/[áàäâ]/gi,"a").replace(/[éèëê]/gi,"e").replace(/[íìïî]/gi,"i").replace(/[óòöô]/gi,"o").replace(/[úùüû]/gi,"u").replace(/ñ/gi,"n").replace(/[^a-zA-Z0-9]+/g,"_").replace(/^_|_$/g,"");' +
-        'var accionSlug = accionSeleccionada === "RECOMPRA" ? "Recompra" : (accionSeleccionada === "VENTA CRUZADA" ? "Venta_Cruzada" : "Sin_Accion");' +
-        'var segmentoSlug = "' + segmento.replace(/[áàäâ]/gi,"a").replace(/[éèëê]/gi,"e").replace(/[íìïî]/gi,"i").replace(/[óòöô]/gi,"o").replace(/[úùüû]/gi,"u").replace(/ñ/gi,"n").replace(/[^a-zA-Z0-9\\s]+/g,"").trim().replace(/\\s+/g,"_") + '";' +
+        'var productoSlug = "' + producto.replace(/[^a-zA-Z0-9]+/g, "_") + '";' +
+        'var accionSlug = accionSeleccionada ? accionSeleccionada.replace(/[^a-zA-Z0-9\\s]+/g, "").trim().replace(/\\s+/g, "_") : "Sin_Accion";' +
+        'var segmentoSlug = "' + segmento.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\\s]+/g, "").trim().replace(/\\s+/g, "_") + '";' +
         'var now = new Date();' +
         'var fecha = now.getFullYear() + "-" + padN(now.getMonth()+1) + "-" + padN(now.getDate());' +
         'var fileName = productoSlug + "_" + accionSlug + "_" + segmentoSlug + "_" + fecha + ".xlsx";' +
