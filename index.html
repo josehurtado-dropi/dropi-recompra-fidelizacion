@@ -3257,8 +3257,8 @@ document.addEventListener('DOMContentLoaded', function() {
       '<svg class="chev-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>' +
       '</button>' +
       '<div class="acciones-menu" id="accionesMenu">' +
-      '<div class="acciones-item" onclick="selectAccion(\'RECOMPRA\')">RECOMPRA</div>' +
-      '<div class="acciones-item" onclick="selectAccion(\'VENTA CRUZADA\')">VENTA CRUZADA</div>' +
+      '<div class="acciones-item" id="opt-recompra">RECOMPRA</div>' +
+      '<div class="acciones-item" id="opt-ventacruzada">VENTA CRUZADA</div>' +
       '</div></div></div>' +
       '<div class="cd-table-card"><table class="cd-table"><thead><tr>' +
       '<th><input type="checkbox" class="cd-checkbox" id="cdSelectAll" checked onclick="toggleAllRows(this)"></th>' +
@@ -3349,6 +3349,12 @@ document.addEventListener('DOMContentLoaded', function() {
         'document.getElementById("accionesMenu").classList.toggle("open");' +
         'document.getElementById("accionesBtn").classList.toggle("open");' +
       '}' +
+      'document.addEventListener("DOMContentLoaded",function(){' +
+        'var oR=document.getElementById("opt-recompra");' +
+        'var oV=document.getElementById("opt-ventacruzada");' +
+        'if(oR)oR.addEventListener("click",function(){selectAccion("RECOMPRA");});' +
+        'if(oV)oV.addEventListener("click",function(){selectAccion("VENTA CRUZADA");});' +
+      '});' +
       'function selectAccion(nombre){' +
         'accionSeleccionada = nombre;' +
         'document.getElementById("accionesLabel").textContent = nombre;' +
