@@ -2359,7 +2359,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <span id="saldo-cartera">$ 27.924.380</span>
       </div>
     
-      <button id="btnCerrarSesion" onclick="cerrarSesion()" title="Cerrar sesión" style="display:none;align-items:center;gap:6px;background:#FEF2F2;color:#DC2626;border:1.5px solid #FECACA;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;margin-left:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Cerrar sesión</button></div>
+      <!-- Input oculto para subir archivo --><input type="file" id="inputSubirData" accept=".xlsx,.xls,.csv" style="display:none;" onchange="procesarArchivoData(this)"><button id="btnSubirData" onclick="document.getElementById('inputSubirData').click()" title="Subir Data" style="display:none;align-items:center;gap:6px;background:#E8F5EE;color:#15803D;border:1.5px solid #B8E4CB;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;margin-right:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Subir Data</button><button id="btnCerrarSesion" onclick="cerrarSesion()" title="Cerrar sesión" style="display:none;align-items:center;gap:6px;background:#FEF2F2;color:#DC2626;border:1.5px solid #FECACA;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;margin-left:8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Cerrar sesión</button></div>
 
     <div class="content">
       <div class="view active" id="view-home">
@@ -4026,6 +4026,8 @@ window.PRODUCTO_IMGS = {
   function mostrarBtnLogout() {
     var btn = document.getElementById('btnCerrarSesion');
     if (btn) btn.style.display = 'inline-flex';
+    var btnSubir = document.getElementById('btnSubirData');
+    if (btnSubir) btnSubir.style.display = 'inline-flex';
   }
 
   // ── Callback de login exitoso ─────────────────────────────
@@ -4082,6 +4084,344 @@ window.PRODUCTO_IMGS = {
       setBadge('error');
       console.error('[Supabase] Error init:', e);
     }
+  });
+
+})();
+</script>
+
+
+<script>
+// ============================================================
+// MÓDULO SUBIR DATA — Carga de archivo Excel/CSV del Dropshipper
+// ============================================================
+(function() {
+
+  // ── UI de progreso ────────────────────────────────────────
+  function crearModalProgreso() {
+    if (document.getElementById('modalSubirData')) return;
+    var modal = document.createElement('div');
+    modal.id = 'modalSubirData';
+    modal.style.cssText = [
+      'display:none','position:fixed','inset:0','z-index:99998',
+      'background:rgba(0,0,0,0.55)','align-items:center','justify-content:center',
+      'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif'
+    ].join(';');
+    modal.innerHTML = [
+      '<div style="background:#fff;border-radius:16px;padding:2rem;width:90%;max-width:460px;box-shadow:0 20px 60px rgba(0,0,0,0.2);">',
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;">',
+          '<div style="width:40px;height:40px;border-radius:50%;background:#E8F5EE;display:flex;align-items:center;justify-content:center;flex-shrink:0;">',
+            '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#15803D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+          '</div>',
+          '<div>',
+            '<div style="font-size:15px;font-weight:800;color:#1B1D23;" id="modalSubirTitulo">Procesando archivo...</div>',
+            '<div style="font-size:12px;color:#6B7280;" id="modalSubirSubtitulo">Validando columnas</div>',
+          '</div>',
+        '</div>',
+        // Barra de progreso
+        '<div style="background:#F3F4F6;border-radius:100px;height:8px;margin-bottom:0.75rem;overflow:hidden;">',
+          '<div id="modalSubirBarra" style="height:100%;border-radius:100px;background:linear-gradient(90deg,#15803D,#22C55E);width:0%;transition:width 0.4s ease;"></div>',
+        '</div>',
+        '<div style="font-size:12px;color:#6B7280;margin-bottom:1rem;" id="modalSubirMensaje">Leyendo archivo...</div>',
+        // Estado final (oculto al inicio)
+        '<div id="modalSubirResultado" style="display:none;padding:12px;border-radius:10px;font-size:13px;font-weight:700;margin-bottom:1rem;"></div>',
+        '<button id="modalSubirCerrar" onclick="cerrarModalSubir()" style="display:none;width:100%;height:40px;background:#1B1D23;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">Ver mi información actualizada</button>',
+      '</div>'
+    ].join('');
+    document.body.appendChild(modal);
+  }
+
+  function mostrarModal() {
+    var m = document.getElementById('modalSubirData');
+    if (m) { m.style.display = 'flex'; }
+  }
+
+  window.cerrarModalSubir = function() {
+    var m = document.getElementById('modalSubirData');
+    if (m) m.style.display = 'none';
+    // Recargar el módulo con los nuevos datos
+    if (typeof window.onLoginExitoso === 'function' && window._usuarioActual) {
+      window.onLoginExitoso(window._usuarioActual);
+    }
+    // Resetear el input de archivo
+    var inp = document.getElementById('inputSubirData');
+    if (inp) inp.value = '';
+  };
+
+  function setProgreso(pct, titulo, subtitulo, mensaje) {
+    var barra = document.getElementById('modalSubirBarra');
+    var tit   = document.getElementById('modalSubirTitulo');
+    var sub   = document.getElementById('modalSubirSubtitulo');
+    var msg   = document.getElementById('modalSubirMensaje');
+    if (barra) barra.style.width = pct + '%';
+    if (tit && titulo) tit.textContent = titulo;
+    if (sub && subtitulo) sub.textContent = subtitulo;
+    if (msg && mensaje) msg.textContent = mensaje;
+  }
+
+  function mostrarResultado(exito, resumen) {
+    var res = document.getElementById('modalSubirResultado');
+    var btn = document.getElementById('modalSubirCerrar');
+    if (res) {
+      res.style.display = 'block';
+      res.style.background = exito ? '#F0FDF4' : '#FEF2F2';
+      res.style.color = exito ? '#15803D' : '#DC2626';
+      res.style.border = '1px solid ' + (exito ? '#B8E4CB' : '#FECACA');
+      res.innerHTML = resumen;
+    }
+    if (btn) btn.style.display = 'block';
+  }
+
+  // ── Parsear fecha DD/MM/YYYY o YYYY-MM-DD ─────────────────
+  function parseFecha(val) {
+    if (!val) return null;
+    var s = String(val).trim();
+    // Excel a veces entrega fechas como número serial
+    if (/^\d{5}$/.test(s)) {
+      var d = new Date((parseInt(s) - 25569) * 86400 * 1000);
+      return d.toISOString().split('T')[0];
+    }
+    // DD/MM/YYYY
+    var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) return m[3] + '-' + m[2].padStart(2,'0') + '-' + m[1].padStart(2,'0');
+    // YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    return null;
+  }
+
+  // ── Leer el archivo Excel/CSV ─────────────────────────────
+  function leerArchivo(file, callback) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var data = new Uint8Array(e.target.result);
+      var workbook = null;
+      try {
+        workbook = XLSX.read(data, { type: 'array', cellDates: false });
+      } catch(err) {
+        callback(null, 'No se pudo leer el archivo. Verifica que sea Excel (.xlsx) o CSV.');
+        return;
+      }
+      var sheet = workbook.Sheets[workbook.SheetNames[0]];
+      var rows  = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      callback(rows, null);
+    };
+    reader.onerror = function() { callback(null, 'Error al leer el archivo.'); };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ── Columnas requeridas ───────────────────────────────────
+  var COLS_REQUERIDAS = [
+    'correo_dropshipper','id_orden','id_producto','nombre_producto',
+    'fecha_entrega','estado_orden','nombre_cliente','telefono_cliente',
+    'valor_orden','costo_proveedor','precio_flete'
+  ];
+
+  // ── Procesar y subir a Supabase ───────────────────────────
+  window.procesarArchivoData = async function(input) {
+    var file = input.files[0];
+    if (!file) return;
+
+    crearModalProgreso();
+    mostrarModal();
+    setProgreso(5, 'Leyendo archivo...', file.name, 'Cargando ' + (file.size/1024).toFixed(0) + ' KB');
+
+    // Esperar a que XLSX esté disponible
+    var intentos = 0;
+    while (typeof XLSX === 'undefined' && intentos < 20) {
+      await new Promise(r => setTimeout(r, 200));
+      intentos++;
+    }
+    if (typeof XLSX === 'undefined') {
+      mostrarResultado(false, '❌ No se pudo cargar la librería de Excel. Recarga la página e intenta de nuevo.');
+      return;
+    }
+
+    leerArchivo(file, async function(rows, errorLectura) {
+      if (errorLectura) {
+        setProgreso(100, 'Error', '', '');
+        mostrarResultado(false, '❌ ' + errorLectura);
+        return;
+      }
+
+      setProgreso(20, 'Validando columnas...', 'Verificando estructura del archivo', '');
+
+      // Encontrar la fila de encabezados (puede estar en fila 1, 2, 3 o 4)
+      var headerRow = -1;
+      var headerMap = {};
+      for (var ri = 0; ri < Math.min(rows.length, 6); ri++) {
+        var row = rows[ri].map(function(c) { return String(c).trim().toLowerCase().replace(/\s+/g,'_'); });
+        var found = 0;
+        COLS_REQUERIDAS.forEach(function(col) { if (row.indexOf(col) >= 0) found++; });
+        if (found >= 5) {
+          headerRow = ri;
+          row.forEach(function(col, idx) { headerMap[col] = idx; });
+          break;
+        }
+      }
+
+      if (headerRow < 0) {
+        mostrarResultado(false,
+          '❌ No se encontraron las columnas requeridas.<br><br>' +
+          'Columnas necesarias: <b>' + COLS_REQUERIDAS.join(', ') + '</b><br><br>' +
+          'Usa el formato entregado por el equipo de Dropi.'
+        );
+        return;
+      }
+
+      setProgreso(35, 'Procesando filas...', 'Leyendo órdenes del archivo', '');
+
+      // Obtener correo del usuario autenticado
+      var correoUsuario = window._usuarioActual ? window._usuarioActual.email : null;
+      if (!correoUsuario) {
+        mostrarResultado(false, '❌ No hay sesión activa. Cierra sesión e ingresa de nuevo.');
+        return;
+      }
+
+      // Procesar filas
+      var pedidos = [];
+      var errores = 0;
+      var saltadas = 0;
+
+      for (var i = headerRow + 1; i < rows.length; i++) {
+        var row = rows[i];
+        if (!row || row.every(function(c) { return !c; })) continue; // fila vacía
+
+        var correoFila = String(row[headerMap['correo_dropshipper']] || '').trim().toLowerCase();
+        var estado = String(row[headerMap['estado_orden']] || '').trim().toUpperCase();
+
+        // Solo procesar si el correo coincide con el usuario autenticado
+        if (correoFila && correoFila !== correoUsuario.toLowerCase()) {
+          saltadas++;
+          continue;
+        }
+
+        // Solo órdenes ENTREGADO
+        if (estado !== 'ENTREGADO') { saltadas++; continue; }
+
+        var fechaEntrega = parseFecha(row[headerMap['fecha_entrega']]);
+        if (!fechaEntrega) { errores++; continue; }
+
+        // Validar que la fecha sea de los últimos 12 meses
+        var hoy = new Date();
+        var hace365 = new Date(hoy); hace365.setDate(hoy.getDate() - 365);
+        var fEntrega = new Date(fechaEntrega);
+        if (fEntrega < hace365 || fEntrega > hoy) { saltadas++; continue; }
+
+        pedidos.push({
+          dropshipper_id:       null, // se llena abajo
+          correo_dropshipper:   correoUsuario,
+          id_orden:             String(row[headerMap['id_orden']] || '').trim(),
+          id_producto:          String(row[headerMap['id_producto']] || '').trim(),
+          nombre_producto:      String(row[headerMap['nombre_producto']] || '').trim(),
+          nombre_proveedor:     headerMap['nombre_proveedor'] !== undefined ? String(row[headerMap['nombre_proveedor']] || '').trim() : '',
+          url_foto_producto:    headerMap['url_foto_producto'] !== undefined ? String(row[headerMap['url_foto_producto']] || '').trim() : '',
+          fecha_creacion_orden: parseFecha(row[headerMap['fecha_creacion_orden']]),
+          fecha_entrega:        fechaEntrega,
+          estado_orden:         'ENTREGADO',
+          nombre_cliente:       String(row[headerMap['nombre_cliente']] || '').trim(),
+          telefono_cliente:     String(row[headerMap['telefono_cliente']] || '').trim().replace(/\D/g,''),
+          valor_orden:          parseFloat(String(row[headerMap['valor_orden']] || '0').replace(/[^0-9.]/g,'')) || 0,
+          costo_proveedor:      parseFloat(String(row[headerMap['costo_proveedor']] || '0').replace(/[^0-9.]/g,'')) || 0,
+          precio_flete:         parseFloat(String(row[headerMap['precio_flete']] || '0').replace(/[^0-9.]/g,'')) || 0,
+          departamento:         headerMap['departamento'] !== undefined ? String(row[headerMap['departamento']] || '').trim().toUpperCase() : '',
+          ciudad:               headerMap['ciudad'] !== undefined ? String(row[headerMap['ciudad']] || '').trim().toUpperCase() : '',
+          transportadora:       headerMap['transportadora'] !== undefined ? String(row[headerMap['transportadora']] || '').trim().toUpperCase() : '',
+          tipo_envio:           headerMap['tipo_envio'] !== undefined ? String(row[headerMap['tipo_envio']] || '').trim().toUpperCase() : 'CON RECAUDO',
+        });
+      }
+
+      if (pedidos.length === 0) {
+        mostrarResultado(false,
+          '⚠️ No se encontraron órdenes válidas.<br><br>' +
+          'Verifica que:<br>• El estado sea <b>ENTREGADO</b><br>' +
+          '• El correo del archivo sea <b>' + correoUsuario + '</b><br>' +
+          '• Las fechas estén dentro del último año'
+        );
+        return;
+      }
+
+      setProgreso(55, 'Conectando con la base de datos...', pedidos.length + ' órdenes válidas encontradas', '');
+
+      // Obtener el supabase client
+      var supa = window._supaLogin || (window.supabase && window.supabase.createClient
+        ? window.supabase.createClient(
+            'https://tjfpnvlnqjfjjgjcjizb.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c'
+          )
+        : null);
+
+      if (!supa) {
+        mostrarResultado(false, '❌ No hay conexión con la base de datos. Recarga la página e intenta de nuevo.');
+        return;
+      }
+
+      setProgreso(65, 'Borrando datos anteriores...', 'Limpiando información previa', '');
+
+      // PASO 1: Borrar pedidos anteriores del Dropshipper
+      var { error: errBorrar } = await supa
+        .from('pedidos')
+        .delete()
+        .eq('correo_dropshipper', correoUsuario);
+
+      if (errBorrar) {
+        mostrarResultado(false, '❌ Error al limpiar datos anteriores: ' + errBorrar.message);
+        return;
+      }
+
+      setProgreso(75, 'Obteniendo perfil...', 'Verificando tu cuenta', '');
+
+      // PASO 2: Obtener el dropshipper_id del usuario autenticado
+      var dropshipperId = null;
+      var { data: dsData } = await supa
+        .from('dropshippers')
+        .select('id')
+        .eq('email', correoUsuario)
+        .limit(1)
+        .single();
+
+      if (dsData) {
+        dropshipperId = dsData.id;
+      } else {
+        // Si no existe en dropshippers, crearlo
+        var { data: newDs } = await supa
+          .from('dropshippers')
+          .insert({ nombre: correoUsuario.split('@')[0], email: correoUsuario, tienda_nombre: 'Mi Tienda', activo: true })
+          .select().single();
+        if (newDs) dropshipperId = newDs.id;
+      }
+
+      // Asignar dropshipper_id a todos los pedidos
+      pedidos.forEach(function(p) { p.dropshipper_id = dropshipperId; });
+
+      setProgreso(85, 'Subiendo datos...', 'Cargando ' + pedidos.length + ' órdenes a Supabase', '');
+
+      // PASO 3: Insertar en lotes de 50
+      var BATCH = 50;
+      var erroresSubida = 0;
+      for (var b = 0; b < pedidos.length; b += BATCH) {
+        var lote = pedidos.slice(b, b + BATCH);
+        var pct = 85 + Math.round((b / pedidos.length) * 12);
+        setProgreso(pct, 'Subiendo datos...', 'Lote ' + (Math.floor(b/BATCH)+1) + ' de ' + Math.ceil(pedidos.length/BATCH), '');
+        var { error: errIns } = await supa.from('pedidos').insert(lote);
+        if (errIns) { erroresSubida++; console.error('Error lote:', errIns); }
+      }
+
+      setProgreso(100, '¡Listo!', 'Datos cargados correctamente', '');
+
+      // Resumen final
+      var resumen = erroresSubida === 0
+        ? '✅ <b>' + pedidos.length + ' órdenes</b> cargadas correctamente.<br>' +
+          (saltadas > 0 ? '⚪ ' + saltadas + ' filas omitidas (fuera del rango o sin coincidencia).<br>' : '') +
+          '<br>El módulo se actualizará con tu información.'
+        : '⚠️ <b>' + (pedidos.length - erroresSubida * BATCH) + ' órdenes</b> cargadas.<br>' +
+          '❌ ' + erroresSubida + ' lotes con error. Intenta de nuevo si falta información.';
+
+      mostrarResultado(true, resumen);
+    });
+  };
+
+  // Inicializar el modal al cargar
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(crearModalProgreso, 1000);
   });
 
 })();
