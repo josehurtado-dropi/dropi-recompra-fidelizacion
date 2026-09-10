@@ -4352,7 +4352,15 @@ window.PRODUCTO_IMGS = {
         var pct = 85 + Math.round((b / pedidos.length) * 12);
         setProgreso(pct, 'Subiendo datos...', 'Lote ' + (Math.floor(b/BATCH)+1) + ' de ' + Math.ceil(pedidos.length/BATCH), '');
         var { error: errIns } = await supa.from('pedidos').insert(lote);
-        if (errIns) { erroresSubida++; console.error('Error lote:', errIns); }
+        if (errIns) {
+          // Lote fallo - reintentar fila por fila para no perder todo el lote
+          var erroresFila = 0;
+          for (var fi = 0; fi < lote.length; fi++) {
+            var { error: errFila } = await supa.from('pedidos').insert([lote[fi]]);
+            if (errFila) erroresFila++;
+          }
+          if (erroresFila > 0) erroresSubida++;
+        }
       }
 
       setProgreso(100, '¡Listo!', 'Datos cargados correctamente', '');
