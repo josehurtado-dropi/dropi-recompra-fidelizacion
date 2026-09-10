@@ -4107,7 +4107,30 @@ window.PRODUCTO_IMGS = {
         callback(null, 'No se pudo leer el archivo. Verifica que sea Excel (.xlsx) o CSV.');
         return;
       }
-      var sheet = workbook.Sheets[workbook.SheetNames[0]];
+      // Buscar la hoja que tiene los datos (puede no ser la primera)
+        var sheet = null;
+        var sheetNames = workbook.SheetNames;
+        // Primero intentar encontrar hoja llamada DATOS_DROPI o similar
+        for (var si = 0; si < sheetNames.length; si++) {
+          var sname = sheetNames[si].toUpperCase().replace(/[^A-Z0-9]/g,'');
+          if (sname.indexOf('DATOS') >= 0 || sname.indexOf('DATA') >= 0 || sname.indexOf('DROPI') >= 0) {
+            sheet = workbook.Sheets[sheetNames[si]];
+            break;
+          }
+        }
+        // Si no encontro por nombre, buscar la hoja con mas filas
+        if (!sheet) {
+          var maxRows = 0;
+          for (var si = 0; si < sheetNames.length; si++) {
+            var s = workbook.Sheets[sheetNames[si]];
+            var ref = s['!ref'] || '';
+            var match = ref.match(/\d+$/);
+            var nrows = match ? parseInt(match[0]) : 0;
+            if (nrows > maxRows) { maxRows = nrows; sheet = s; }
+          }
+        }
+        // Fallback a la primera hoja
+        if (!sheet) sheet = workbook.Sheets[sheetNames[0]];
       var rows  = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
       callback(rows, null);
     };
@@ -4154,7 +4177,7 @@ window.PRODUCTO_IMGS = {
       // Encontrar la fila de encabezados (puede estar en fila 1, 2, 3 o 4)
       var headerRow = -1;
       var headerMap = {};
-      for (var ri = 0; ri < Math.min(rows.length, 6); ri++) {
+      for (var ri = 0; ri < Math.min(rows.length, 10); ri++) {
         var row = rows[ri].map(function(c) { return String(c).trim().toLowerCase().replace(/\s+/g,'_'); });
         var found = 0;
         COLS_REQUERIDAS.forEach(function(col) { if (row.indexOf(col) >= 0) found++; });
