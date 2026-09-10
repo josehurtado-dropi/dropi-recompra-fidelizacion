@@ -3578,28 +3578,27 @@ window.PRODUCTO_IMGS = {
       .eq('estado_orden', 'ENTREGADO')
       .gte('fecha_entrega', hace365Str)
       .order('fecha_entrega', { ascending: false })
-      .range(supaPage * 1000, (supaPage + 1) * 1000 - 1);
-
-    // Si hay mas paginas, traerlas todas
-    if (!error && data && data.length === 1000) {
-      var allData = data.slice();
-      var nextPage = 1;
-      var keepGoing = true;
-      while (keepGoing) {
-        var { data: pd, error: pe } = await supa
-          .from('pedidos')
-          .select('id_producto,nombre_producto,nombre_proveedor,url_foto_producto,valor_orden,costo_proveedor,precio_flete,ganancia,fecha_entrega,nombre_cliente,telefono_cliente,ciudad,departamento,transportadora,tipo_envio')
-          .eq('estado_orden', 'ENTREGADO')
-          .gte('fecha_entrega', hace365Str)
-          .order('fecha_entrega', { ascending: false })
-          .range(nextPage * 1000, (nextPage + 1) * 1000 - 1);
-        if (pe || !pd || pd.length === 0) { keepGoing = false; }
-        else { allData = allData.concat(pd); nextPage++; if (pd.length < 1000) keepGoing = false; }
-      }
-      data = allData;
-    }
+      .range(0, 999);
 
     if (error) { console.error('[Supabase] Error pedidos:', error); return; }
+
+    // Paginar hasta traer TODOS los registros sin importar el total
+    var allData = data ? data.slice() : [];
+    var nextFrom = 1000;
+    while (data && data.length === 1000) {
+      var { data: pd, error: pe } = await supa
+        .from('pedidos')
+        .select('id_producto,nombre_producto,nombre_proveedor,url_foto_producto,valor_orden,costo_proveedor,precio_flete,ganancia,fecha_entrega,nombre_cliente,telefono_cliente,ciudad,departamento,transportadora,tipo_envio')
+        .eq('estado_orden', 'ENTREGADO')
+        .gte('fecha_entrega', hace365Str)
+        .order('fecha_entrega', { ascending: false })
+        .range(nextFrom, nextFrom + 999);
+      if (pe || !pd || pd.length === 0) break;
+      allData = allData.concat(pd);
+      nextFrom += 1000;
+      data = pd; // para que el while verifique si hubo pagina completa
+    }
+    data = allData;
     if (!data || !data.length) {
       var track = document.getElementById('productosCarouselTrack');
       if (track) track.innerHTML =
