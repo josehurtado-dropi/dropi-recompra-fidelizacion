@@ -3819,7 +3819,7 @@ window.PRODUCTO_IMGS = {
             '<td>' + (c.nombre || '') + '</td>' +
             '<td>' + (c.telefono || '') + '</td>' +
             '<td><span class="status-pill">ENTREGADO</span></td>' +
-            '<td>' + (c.tipo_envio || 'CON RECAUDO') + '</td>' +
+            '<td>' + (function(t){t=(t||'').trim().toUpperCase();if(t==='' || t==='NORMAL' || t==='COD') return 'CON RECAUDO';if(t==='PREPAGO'||t==='PAGADO') return 'SIN RECAUDO';return t||'CON RECAUDO';})(c.tipo_envio) + '</td>' +
             '<td><b style="color:#26272B;">' + (c.precio_flete ? '$' + Math.round(c.precio_flete).toLocaleString('es-CO') : '$0') + '</b></td>' +
             '<td>' + (c.departamento || '') + '</td>' +
             '<td>' + (c.ciudad || '') + '</td>' +
@@ -4232,7 +4232,7 @@ window.PRODUCTO_IMGS = {
           departamento:         headerMap['departamento'] !== undefined ? String(row[headerMap['departamento']] || '').trim().toUpperCase() : '',
           ciudad:               headerMap['ciudad'] !== undefined ? String(row[headerMap['ciudad']] || '').trim().toUpperCase() : '',
           transportadora:       headerMap['transportadora'] !== undefined ? String(row[headerMap['transportadora']] || '').trim().toUpperCase() : '',
-          tipo_envio:           headerMap['tipo_envio'] !== undefined ? String(row[headerMap['tipo_envio']] || '').trim().toUpperCase() : 'CON RECAUDO',
+          tipo_envio:           (function(){var t = headerMap['tipo_envio'] !== undefined ? String(row[headerMap['tipo_envio']] || '').trim().toUpperCase() : 'CON RECAUDO';if(t === 'NORMAL' || t === '' || t === 'COD') return 'CON RECAUDO';if(t === 'SIN RECAUDO' || t === 'PREPAGO' || t === 'PAGADO') return 'SIN RECAUDO';return t || 'CON RECAUDO';})(),
         });
       }
 
