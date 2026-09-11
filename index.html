@@ -3571,14 +3571,32 @@ window.PRODUCTO_IMGS = {
     var hace365Str = hace365.toISOString().split('T')[0];
 
     // Traer todos los pedidos del último año del dropshipper autenticado
-    var { data, error } = await supa
-      .from('pedidos')
-      .select('id_producto,nombre_producto,nombre_proveedor,url_foto_producto,valor_orden,costo_proveedor,precio_flete,ganancia,fecha_entrega,nombre_cliente,telefono_cliente,ciudad,departamento,transportadora,tipo_envio')
-      .eq('estado_orden', 'ENTREGADO')
-      .gte('fecha_entrega', hace365Str)
-      .order('fecha_entrega', { ascending: false })
-      .limit(10000);
-
+    // Usar fetch directo para traer TODOS los pedidos sin limite de 1000 filas
+    var SUPA_URL  = 'https://tjfpnvlnqjfjjgjcjizb.supabase.co';
+    var SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c';
+    var sesion    = window._sesionDropshipper;
+    var token     = sesion && sesion.access_token ? sesion.access_token : '';
+    var cols      = 'id_producto,nombre_producto,nombre_proveedor,url_foto_producto,valor_orden,costo_proveedor,precio_flete,ganancia,fecha_entrega,nombre_cliente,telefono_cliente,ciudad,departamento,transportadora,tipo_envio';
+    var filtros   = 'estado_orden=eq.ENTREGADO&fecha_entrega=gte.' + hace365Str + '&order=fecha_entrega.desc';
+    var data = [], error = null, fetchFrom = 0, fetchSize = 1000, fetchDone = false;
+    while (!fetchDone) {
+      var fetchResp = await fetch(
+        SUPA_URL + '/rest/v1/pedidos?select=' + cols + '&' + filtros,
+        { headers: {
+            'apikey': SUPA_KEY,
+            'Authorization': 'Bearer ' + (token || SUPA_KEY),
+            'Range': fetchFrom + '-' + (fetchFrom + fetchSize - 1),
+            'Range-Unit': 'items',
+            'Prefer': 'count=none'
+          }
+        }
+      );
+      if (!fetchResp.ok) { error = 'HTTP ' + fetchResp.status; fetchDone = true; break; }
+      var page = await fetchResp.json();
+      if (!Array.isArray(page) || page.length === 0) { fetchDone = true; break; }
+      data = data.concat(page);
+      if (page.length < fetchSize) { fetchDone = true; } else { fetchFrom += fetchSize; }
+    }
     if (error) { console.error('[Supabase] Error pedidos:', error); return; }
     if (!data || !data.length) {
       var track = document.getElementById('productosCarouselTrack');
