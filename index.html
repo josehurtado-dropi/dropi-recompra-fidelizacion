@@ -3571,13 +3571,20 @@ window.PRODUCTO_IMGS = {
     var hace365Str = hace365.toISOString().split('T')[0];
 
     // Traer todos los pedidos del último año del dropshipper autenticado
-    var { data, error } = await supa
-      .from('pedidos')
-      .select('id_producto,nombre_producto,nombre_proveedor,url_foto_producto,valor_orden,costo_proveedor,precio_flete,ganancia,fecha_entrega,nombre_cliente,telefono_cliente,ciudad,departamento,transportadora,tipo_envio')
-      .eq('estado_orden', 'ENTREGADO')
-      .gte('fecha_entrega', hace365Str)
-      .order('fecha_entrega', { ascending: false });
-
+    // Paginar para traer TODOS los pedidos sin importar el volumen
+    var data = [], _pgFrom = 0, _pgSize = 1000, _pgDone = false;
+    while (!_pgDone) {
+      var { data: _pgData, error } = await supa
+        .from('pedidos')
+        .select('id_producto,nombre_producto,nombre_proveedor,url_foto_producto,valor_orden,costo_proveedor,precio_flete,ganancia,fecha_entrega,nombre_cliente,telefono_cliente,ciudad,departamento,transportadora,tipo_envio')
+        .eq('estado_orden', 'ENTREGADO')
+        .gte('fecha_entrega', hace365Str)
+        .order('fecha_entrega', { ascending: false })
+        .range(_pgFrom, _pgFrom + _pgSize - 1);
+      if (error || !_pgData || _pgData.length === 0) { _pgDone = true; break; }
+      data = data.concat(_pgData);
+      if (_pgData.length < _pgSize) { _pgDone = true; } else { _pgFrom += _pgSize; }
+    }
     if (error) { console.error('[Supabase] Error pedidos:', error); return; }
     if (!data || !data.length) {
       var track = document.getElementById('productosCarouselTrack');
@@ -4107,24 +4114,7 @@ window.PRODUCTO_IMGS = {
         callback(null, 'No se pudo leer el archivo. Verifica que sea Excel (.xlsx) o CSV.');
         return;
       }
-      var sheet = null;
-        var sheetNames = workbook.SheetNames;
-        for (var si = 0; si < sheetNames.length; si++) {
-          var sname = sheetNames[si].toUpperCase().replace(/[^A-Z0-9]/g,'');
-          if (sname.indexOf('DATOS') >= 0 || sname.indexOf('DROPI') >= 0) {
-            sheet = workbook.Sheets[sheetNames[si]]; break;
-          }
-        }
-        if (!sheet) {
-          var maxRows = 0;
-          for (var si2 = 0; si2 < sheetNames.length; si2++) {
-            var s2 = workbook.Sheets[sheetNames[si2]];
-            var ref2 = (s2['!ref'] || '').match(/\d+$/);
-            var nr2 = ref2 ? parseInt(ref2[0]) : 0;
-            if (nr2 > maxRows) { maxRows = nr2; sheet = s2; }
-          }
-        }
-        if (!sheet) sheet = workbook.Sheets[sheetNames[0]];
+      var sheet = workbook.Sheets[workbook.SheetNames[0]];
       var rows  = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
       callback(rows, null);
     };
@@ -4249,7 +4239,7 @@ window.PRODUCTO_IMGS = {
           departamento:         headerMap['departamento'] !== undefined ? String(row[headerMap['departamento']] || '').trim().toUpperCase() : '',
           ciudad:               headerMap['ciudad'] !== undefined ? String(row[headerMap['ciudad']] || '').trim().toUpperCase() : '',
           transportadora:       headerMap['transportadora'] !== undefined ? String(row[headerMap['transportadora']] || '').trim().toUpperCase() : '',
-          tipo_envio:           (function(){var t=headerMap['tipo_envio']!==undefined?String(row[headerMap['tipo_envio']]||'').trim().toUpperCase():'CON RECAUDO';if(t===''||t==='NORMAL'||t==='COD')return 'CON RECAUDO';if(t==='PREPAGO'||t==='PAGADO'||t==='SIN RECAUDO')return 'SIN RECAUDO';return t||'CON RECAUDO';})(),
+          tipo_envio: (function(){var t=headerMap['tipo_envio']!==undefined?String(row[headerMap['tipo_envio']]||'').trim().toUpperCase():'CON RECAUDO';return(t===''||t==='NORMAL'||t==='COD')?'CON RECAUDO':(t==='PREPAGO'||t==='PAGADO')?'SIN RECAUDO':t||'CON RECAUDO';})(),
         });
       }
 
@@ -4327,12 +4317,12 @@ window.PRODUCTO_IMGS = {
         setProgreso(pct, 'Subiendo datos...', 'Lote ' + (Math.floor(b/BATCH)+1) + ' de ' + Math.ceil(pedidos.length/BATCH), '');
         var { error: errIns } = await supa.from('pedidos').insert(lote);
         if (errIns) {
-          var errFCount = 0;
-          for (var fi = 0; fi < lote.length; fi++) {
-            var { error: eF } = await supa.from('pedidos').insert([lote[fi]]);
-            if (eF) errFCount++;
+          var _eFC = 0;
+          for (var _fi = 0; _fi < lote.length; _fi++) {
+            var { error: _eF } = await supa.from('pedidos').insert([lote[_fi]]);
+            if (_eF) _eFC++;
           }
-          if (errFCount > 0) erroresSubida++;
+          if (_eFC > 0) erroresSubida++;
         }
       }
 
