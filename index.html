@@ -3693,8 +3693,8 @@ window.PRODUCTO_IMGS = {
   function renderProductCard(p, i, active) {
     var imgSrc = p.imagen_url || (window.PRODUCTO_IMGS && window.PRODUCTO_IMGS[p.nombre]) || null;
     var img = imgSrc
-      ? '<img src="' + imgSrc + '" alt="' + p.nombre + '" style="width:150px;height:150px;object-fit:contain;flex-shrink:0;border-radius:10px;" onerror="this.style.display=\'none\'">'
-      : '<div style="width:150px;height:150px;flex-shrink:0;border-radius:10px;background:#F5F6F8;display:flex;align-items:center;justify-content:center;font-size:40px;">📦</div>';
+      ? '<img src="' + imgSrc + '" alt="' + p.nombre + '" style="width:150px;height:150px;object-fit:contain;flex-shrink:0;border-radius:10px;" onerror="this.src='https://dropi.co/static/prod-imgs/no-image.png'">'
+      : '<img src="https://dropi.co/static/prod-imgs/no-image.png" alt="Sin imagen" style="width:150px;height:150px;object-fit:contain;flex-shrink:0;border-radius:10px;">';
 
     var prov = p.proveedor
       ? '<div style="font-size:11px;color:var(--gray);margin-bottom:6px;">Provider: <b style="color:#FF7A1A;">' + p.proveedor + '</b></div>'
