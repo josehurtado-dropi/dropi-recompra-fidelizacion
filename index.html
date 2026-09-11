@@ -4107,7 +4107,24 @@ window.PRODUCTO_IMGS = {
         callback(null, 'No se pudo leer el archivo. Verifica que sea Excel (.xlsx) o CSV.');
         return;
       }
-      var sheet = workbook.Sheets[workbook.SheetNames[0]];
+      var sheet = null;
+        var sheetNames = workbook.SheetNames;
+        for (var si = 0; si < sheetNames.length; si++) {
+          var sname = sheetNames[si].toUpperCase().replace(/[^A-Z0-9]/g,'');
+          if (sname.indexOf('DATOS') >= 0 || sname.indexOf('DROPI') >= 0) {
+            sheet = workbook.Sheets[sheetNames[si]]; break;
+          }
+        }
+        if (!sheet) {
+          var maxRows = 0;
+          for (var si2 = 0; si2 < sheetNames.length; si2++) {
+            var s2 = workbook.Sheets[sheetNames[si2]];
+            var ref2 = (s2['!ref'] || '').match(/\d+$/);
+            var nr2 = ref2 ? parseInt(ref2[0]) : 0;
+            if (nr2 > maxRows) { maxRows = nr2; sheet = s2; }
+          }
+        }
+        if (!sheet) sheet = workbook.Sheets[sheetNames[0]];
       var rows  = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
       callback(rows, null);
     };
@@ -4232,7 +4249,7 @@ window.PRODUCTO_IMGS = {
           departamento:         headerMap['departamento'] !== undefined ? String(row[headerMap['departamento']] || '').trim().toUpperCase() : '',
           ciudad:               headerMap['ciudad'] !== undefined ? String(row[headerMap['ciudad']] || '').trim().toUpperCase() : '',
           transportadora:       headerMap['transportadora'] !== undefined ? String(row[headerMap['transportadora']] || '').trim().toUpperCase() : '',
-          tipo_envio:           headerMap['tipo_envio'] !== undefined ? String(row[headerMap['tipo_envio']] || '').trim().toUpperCase() : 'CON RECAUDO',
+          tipo_envio:           (function(){var t=headerMap['tipo_envio']!==undefined?String(row[headerMap['tipo_envio']]||'').trim().toUpperCase():'CON RECAUDO';if(t===''||t==='NORMAL'||t==='COD')return 'CON RECAUDO';if(t==='PREPAGO'||t==='PAGADO'||t==='SIN RECAUDO')return 'SIN RECAUDO';return t||'CON RECAUDO';})(),
         });
       }
 
@@ -4309,7 +4326,14 @@ window.PRODUCTO_IMGS = {
         var pct = 85 + Math.round((b / pedidos.length) * 12);
         setProgreso(pct, 'Subiendo datos...', 'Lote ' + (Math.floor(b/BATCH)+1) + ' de ' + Math.ceil(pedidos.length/BATCH), '');
         var { error: errIns } = await supa.from('pedidos').insert(lote);
-        if (errIns) { erroresSubida++; console.error('Error lote:', errIns); }
+        if (errIns) {
+          var errFCount = 0;
+          for (var fi = 0; fi < lote.length; fi++) {
+            var { error: eF } = await supa.from('pedidos').insert([lote[fi]]);
+            if (eF) errFCount++;
+          }
+          if (errFCount > 0) erroresSubida++;
+        }
       }
 
       setProgreso(100, '¡Listo!', 'Datos cargados correctamente', '');
