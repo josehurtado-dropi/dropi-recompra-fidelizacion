@@ -2703,7 +2703,7 @@ document.addEventListener('DOMContentLoaded', function() {
       '<div class="content">' +
       '<div class="cd-breadcrumb-lg">Recompra &amp; Fidelización <span class="sep">/</span> Datos Del Cliente <span class="sep">/</span> <span class="current" id="breadcrumbCurrent">Redactar Mensaje</span></div>' +
       '<div class="hero-card-lite">' +
-      '<img class="hero-img-lite" src="' + imgSrc + '" alt="' + producto + '">' +
+      '<img class="hero-img-lite" src="' + (imgSrc || 'https://app.dropi.co/assets/utils/no-image.jpg') + '" alt="' + producto + '" onerror="this.onerror=null;this.src=\'https://app.dropi.co/assets/utils/no-image.jpg\';">' +
       '<div>' +
       '<div class="hero-name-lite">' + producto + '</div>' +
       '<div class="hero-provider-lite">' + providerHTML + '</div>' +
@@ -3678,11 +3678,12 @@ window.PRODUCTO_IMGS = {
   }
 
   // ── Renderizar tarjeta de producto ─────────────────────────
+  var PRODUCTO_IMG_FALLBACK = 'https://app.dropi.co/assets/utils/no-image.jpg';
+  window.PRODUCTO_IMG_FALLBACK = PRODUCTO_IMG_FALLBACK;
+
   function renderProductCard(p, i, active) {
-    var imgSrc = p.imagen_url || (window.PRODUCTO_IMGS && window.PRODUCTO_IMGS[p.nombre]) || null;
-    var img = imgSrc
-      ? '<img src="' + imgSrc + '" alt="' + p.nombre + '" style="width:150px;height:150px;object-fit:contain;flex-shrink:0;border-radius:10px;" onerror="this.style.display=\'none\'">'
-      : '<div style="width:150px;height:150px;flex-shrink:0;border-radius:10px;background:#F5F6F8;display:flex;align-items:center;justify-content:center;font-size:40px;">📦</div>';
+    var imgSrc = p.imagen_url || (window.PRODUCTO_IMGS && window.PRODUCTO_IMGS[p.nombre]) || PRODUCTO_IMG_FALLBACK;
+    var img = '<img src="' + imgSrc + '" alt="' + p.nombre + '" style="width:150px;height:150px;object-fit:contain;flex-shrink:0;border-radius:10px;" onerror="this.onerror=null;this.src=\'' + PRODUCTO_IMG_FALLBACK + '\';">';
 
     var prov = p.proveedor
       ? '<div style="font-size:11px;color:var(--gray);margin-bottom:6px;">Provider: <b style="color:#FF7A1A;">' + p.proveedor + '</b></div>'
@@ -3856,6 +3857,7 @@ window.PRODUCTO_IMGS = {
         if (prodData.proveedor) {
           providerHTML = '<div style="font-size:12px;color:#6B7280;">Provider: <b style="color:#FF7A1A;">' + prodData.proveedor + '</b></div>';
         }
+        if (!imgSrc) imgSrc = window.PRODUCTO_IMG_FALLBACK || '';
 
         // Llamar directamente a abrirVentanaListado con datos reales
         abrirVentanaListado(producto, segmento, rows, clientesReales.length, imgSrc, categoria, providerHTML);
