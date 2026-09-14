@@ -3949,6 +3949,10 @@ window.PRODUCTO_IMGS = {
   window.onLoginExitoso = async function(user) {
     console.log('[Login] Autenticado:', user.email);
     window._usuarioActual = user;
+    // Reutilizar el cliente autenticado del login (con sesión válida) en vez
+    // del cliente sin sesión creado al cargar la página — de lo contrario
+    // auth.uid() es null y las políticas RLS bloquean pedidos/campañas/etc.
+    supa = window._supaLogin || supa;
     try {
       // Verificar que está autorizado como Dropshipper
       var autorizado = await verificarDropshipper(user.id);
@@ -3972,7 +3976,8 @@ window.PRODUCTO_IMGS = {
   document.addEventListener('DOMContentLoaded', async function() {
     crearBadge();
     try {
-      supa = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+      supa = window._supaLogin || window.supabase.createClient(SUPA_URL, SUPA_KEY);
+      window._supaLogin = supa;
       // Verificar si ya hay sesión activa (usuario ya logueado)
       var { data: { session } } = await supa.auth.getSession();
       if (session && session.user) {
