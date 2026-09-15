@@ -3170,6 +3170,7 @@ document.addEventListener('DOMContentLoaded', function() {
       '<th><div class="th-flex">TELÉFONO</div></th>' +
       '<th><div class="th-flex">ESTATUS</div></th>' +
       '<th><div class="th-flex">TIPO DE ENVÍO</div></th>' +
+      '<th><div class="th-flex">TOTAL DE ORDEN</div></th>' +
       '<th><div class="th-flex">PRECIO FLETE</div></th>' +
       '<th><div class="th-flex">DEPARTAMENTO</div></th>' +
       '<th><div class="th-flex">CIUDAD</div></th>' +
@@ -3403,7 +3404,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'setTimeout(function(){' +
           'try {' +
             'var trs = document.querySelectorAll("#cdTableBody tr");' +
-            'var data = [["Nombre Cliente","Teléfono","Estatus","Tipo de Envío","Precio Flete","Departamento","Ciudad","Transportadora","Producto","Fecha Último Movimiento"]];' +
+            'var data = [["Nombre Cliente","Teléfono","Estatus","Tipo de Envío","Total De Orden","Precio Flete","Departamento","Ciudad","Transportadora","Producto","Fecha Último Movimiento"]];' +
             'trs.forEach(function(tr){' +
               'var cb = tr.querySelector(".cd-row-check");' +
               'if(cb && cb.checked){' +
@@ -3412,12 +3413,12 @@ document.addEventListener('DOMContentLoaded', function() {
                   'tds[1].textContent.trim(), tds[2].textContent.trim(), "ENTREGADO CON RECAUDO",' +
                   'tds[4].textContent.trim(), tds[5].textContent.trim(), tds[6].textContent.trim(),' +
                   'tds[7].textContent.trim(), tds[8].textContent.trim(), tds[9].textContent.trim(),' +
-                  'tds[10].textContent.trim()' +
+                  'tds[10].textContent.trim(), tds[11].textContent.trim()' +
                 ']);' +
               '}' +
             '});' +
             'var ws = XLSXref.utils.aoa_to_sheet(data);' +
-            'ws["!cols"] = [{wch:26},{wch:14},{wch:22},{wch:14},{wch:13},{wch:16},{wch:16},{wch:16},{wch:34},{wch:14}];' +
+            'ws["!cols"] = [{wch:26},{wch:14},{wch:22},{wch:14},{wch:13},{wch:13},{wch:16},{wch:16},{wch:16},{wch:34},{wch:14}];' +
             'var wb = XLSXref.utils.book_new();' +
             'XLSXref.utils.book_append_sheet(wb, ws, "Lista Clientes");' +
             'var wbout = XLSXref.write(wb, {bookType:"xlsx", type:"array"});' +
@@ -3643,6 +3644,7 @@ window.PRODUCTO_IMGS = {
               departamento:  p.departamento,
               transportadora: p.transportadora,
               tipo_envio:    p.tipo_envio,
+              valor_orden:   p.valor_orden,
               precio_flete:  p.precio_flete,
               fecha_entrega: p.fecha_entrega
             };
@@ -3829,6 +3831,7 @@ window.PRODUCTO_IMGS = {
             '<td>' + (c.telefono || '') + '</td>' +
             '<td><span class="status-pill">ENTREGADO</span></td>' +
             '<td>' + (c.tipo_envio || 'CON RECAUDO') + '</td>' +
+            '<td>' + (c.valor_orden ? Math.round(c.valor_orden) : '0') + '</td>' +
             '<td><b style="color:#26272B;">' + (c.precio_flete ? '$' + Math.round(c.precio_flete).toLocaleString('es-CO') : '$0') + '</b></td>' +
             '<td>' + (c.departamento || '') + '</td>' +
             '<td>' + (c.ciudad || '') + '</td>' +
