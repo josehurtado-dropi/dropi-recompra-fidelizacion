@@ -3700,9 +3700,11 @@ window.PRODUCTO_IMGS = {
           ordenes:           0,
           facturacion:       0,
           ganancias:         0,
-          seg1_clientes:     [], // mes anterior: 1-30 días
-          seg2_clientes:     [], // 2 meses: 31-60 días
-          seg3_clientes:     [], // 3m-1año: 61-365 días
+          // Con Campaña configurada: seg1 = a 5 días de agotarse, seg2 = se agotó hace 1 mes, seg3 = se agotó hace 2+ meses.
+          // Sin Campaña configurada: seg1 = 1-30 días desde la compra, seg2 = 31-60, seg3 = 61-365 (comportamiento anterior).
+          seg1_clientes:     [],
+          seg2_clientes:     [],
+          seg3_clientes:     [],
         };
       }
       var prod = productosMap[id];
@@ -3710,9 +3712,7 @@ window.PRODUCTO_IMGS = {
       prod.facturacion += parseFloat(p.valor_orden) || 0;
       prod.ganancias   += parseFloat(p.ganancia) || 0;
 
-      // Calcular días desde entrega
       var fechaEntrega = new Date(p.fecha_entrega);
-      var diasDesde = Math.floor((hoy - fechaEntrega) / (1000 * 60 * 60 * 24));
       var cliente = {
               nombre:        p.nombre_cliente,
               telefono:      p.telefono_cliente,
@@ -3726,9 +3726,28 @@ window.PRODUCTO_IMGS = {
               fecha_entrega: p.fecha_entrega
             };
 
-      if (diasDesde >= 1  && diasDesde <= 30)  prod.seg1_clientes.push(cliente);
-      if (diasDesde >= 31 && diasDesde <= 60)  prod.seg2_clientes.push(cliente);
-      if (diasDesde >= 61 && diasDesde <= 365) prod.seg3_clientes.push(cliente);
+      // Segmentación: si el producto tiene "Campaña" configurada (duración
+      // del producto/oferta en días), se segmenta por fecha estimada de
+      // agotamiento; si no, se mantiene el comportamiento anterior (por
+      // fecha de compra/entrega).
+      var dur = BD.duraciones[p.nombre_producto];
+      if (dur) {
+        var cantidadPedido = parseInt(p.cantidad, 10) || 1;
+        var duracionAplicable = cantidadPedido > 1 ? dur.oferta : dur.dias;
+        var fechaAgotamiento = new Date(fechaEntrega);
+        fechaAgotamiento.setDate(fechaAgotamiento.getDate() + duracionAplicable);
+        // Días transcurridos desde que se agota (negativo = aún le queda producto)
+        var diasDesdeAgotamiento = Math.floor((hoy - fechaAgotamiento) / (1000 * 60 * 60 * 24));
+
+        if (diasDesdeAgotamiento >= -5  && diasDesdeAgotamiento <= 0)   prod.seg1_clientes.push(cliente); // a 5 días de agotarse
+        if (diasDesdeAgotamiento >= 1   && diasDesdeAgotamiento <= 30)  prod.seg2_clientes.push(cliente); // se agotó hace 1 mes
+        if (diasDesdeAgotamiento >= 31  && diasDesdeAgotamiento <= 365) prod.seg3_clientes.push(cliente); // se agotó hace 2+ meses
+      } else {
+        var diasDesde = Math.floor((hoy - fechaEntrega) / (1000 * 60 * 60 * 24));
+        if (diasDesde >= 1  && diasDesde <= 30)  prod.seg1_clientes.push(cliente);
+        if (diasDesde >= 31 && diasDesde <= 60)  prod.seg2_clientes.push(cliente);
+        if (diasDesde >= 61 && diasDesde <= 365) prod.seg3_clientes.push(cliente);
+      }
     });
 
     // Convertir a array y ordenar por órdenes entregadas (mayor a menor)
@@ -3774,7 +3793,16 @@ window.PRODUCTO_IMGS = {
       ? '<div style="font-size:11px;color:var(--gray);margin-bottom:6px;">Provider: <b style="color:#FF7A1A;">' + p.proveedor + '</b></div>'
       : '';
 
-    var segmentos = [
+    var dur = BD.duraciones && BD.duraciones[p.nombre];
+
+    // Si el producto tiene campaña configurada, los segmentos se calcularon
+    // en cargarProductos() por fecha de agotamiento; si no, por fecha de
+    // compra (comportamiento anterior). Las etiquetas reflejan cuál aplica.
+    var segmentos = dur ? [
+      { label: 'A 5 Días De Agotarse',         key: 'seg1_clientes', cnt: p.seg1_clientes.length },
+      { label: 'Se Agotó Hace 1 Mes',          key: 'seg2_clientes', cnt: p.seg2_clientes.length },
+      { label: 'Se Agotó Hace 2 Meses o Más',  key: 'seg3_clientes', cnt: p.seg3_clientes.length },
+    ] : [
       { label: 'Compradores Mes Anterior',        key: 'seg1_clientes', cnt: p.seg1_clientes.length },
       { label: 'Compradores 2 Meses Anteriores',  key: 'seg2_clientes', cnt: p.seg2_clientes.length },
       { label: 'Compradores Desde 3 Hasta 1 Año', key: 'seg3_clientes', cnt: p.seg3_clientes.length },
@@ -3783,12 +3811,11 @@ window.PRODUCTO_IMGS = {
     var segsHtml = segmentos.map(function(seg) {
       return '<div class="segment-row">' +
         '<span class="segment-label">' + seg.label + ' <b style="color:#FF7A1A;">(' + seg.cnt + ')</b></span>' +
-        '<button class="segment-btn" onclick="generarListado(\'' + p.nombre.replace(/'/g, "\\'") + "', '" + seg.label.replace(/'/g, "\\'") + "', this)\">" +
+        '<button class="segment-btn" onclick="generarListado(\'' + p.nombre.replace(/'/g, "\\'") + "', '" + seg.label.replace(/'/g, "\\'") + "', this, '" + seg.key + "')\">" +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>' +
         'Ver Listado De Clientes</button></div>';
     }).join('');
 
-    var dur = BD.duraciones && BD.duraciones[p.nombre];
     var durInfo = dur
       ? '<div style="font-size:11px;color:var(--gray);margin-top:2px;">⏱ Duración: <b style="color:var(--ink);">' + dur.dias + ' días</b> · Oferta: <b style="color:var(--ink);">' + dur.oferta + ' días</b></div>'
       : '<div style="font-size:11px;color:var(--gray);margin-top:2px;">⏱ Duración sin configurar</div>';
@@ -3922,7 +3949,7 @@ window.PRODUCTO_IMGS = {
   function aplicarParches() {
     // Parche generarListado — construye filas con datos REALES de Supabase
     if (typeof window.generarListado === 'function' && !window.generarListado._v4) {
-      window.generarListado = function(producto, segmento, btnEl) {
+      window.generarListado = function(producto, segmento, btnEl, segKey) {
         window._campanaActiva.productoOrigen = producto;
         window._campanaActiva.segmento = segmento;
         window._accionExplicita = false;
@@ -3936,11 +3963,17 @@ window.PRODUCTO_IMGS = {
           return;
         }
 
-        // Determinar qué segmento usar
+        // Determinar qué segmento usar. Se prioriza segKey (la clave real del
+        // segmento, seg1_clientes/seg2_clientes/seg3_clientes) sobre el texto
+        // de la etiqueta, ya que esta cambia según si el producto tiene
+        // configurada la duración de campaña (segmentación por agotamiento)
+        // o no (segmentación por fecha de compra, comportamiento anterior).
         var clientesReales = [];
-        if (segmento.indexOf('Mes Anterior') >= 0) {
+        if (segKey && prodData[segKey]) {
+          clientesReales = prodData[segKey];
+        } else if (segmento.indexOf('Mes Anterior') >= 0 || segmento.indexOf('Agotarse') >= 0) {
           clientesReales = prodData.seg1_clientes;
-        } else if (segmento.indexOf('2 Meses') >= 0) {
+        } else if (segmento.indexOf('2 Meses') >= 0 || segmento.indexOf('1 Mes') >= 0) {
           clientesReales = prodData.seg2_clientes;
         } else {
           clientesReales = prodData.seg3_clientes;
