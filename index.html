@@ -2161,7 +2161,7 @@ async function loginCrearContrasena() {
     var { data, error } = await supa.auth.signUp({ email: email, password: pass1 });
     if (error) throw error;
     loginShowSuccess('loginCrearSuccess',
-      '✅ <strong>Cuenta creada.</strong> Te enviamos un correo de confirmación a <strong>' + email + '</strong>.<br>Revisa tu bandeja de entrada y haz clic en el link para activar tu cuenta.'
+      '✅ <strong>Cuenta creada.</strong> Haz clic en <strong>Volver al inicio de sesión</strong> e ingresa tu correo electrónico y contraseña para continuar.'
     );
     document.getElementById('loginCrearEmail').value = '';
     document.getElementById('loginCrearPass1').value = '';
