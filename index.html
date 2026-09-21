@@ -4129,7 +4129,12 @@ window.PRODUCTO_IMGS = {
         callback(null, 'No se pudo leer el archivo. Verifica que sea Excel (.xlsx) o CSV.');
         return;
       }
-      var sheet = workbook.Sheets[workbook.SheetNames[0]];
+      // Preferir la hoja "DATOS_DROPI" (el archivo trae hojas extra de instrucciones,
+      // valores válidos y cálculos); si no existe, usar la primera hoja como respaldo.
+      var sheetName = workbook.SheetNames.filter(function(n) {
+        return n.trim().toLowerCase() === 'datos_dropi';
+      })[0] || workbook.SheetNames[0];
+      var sheet = workbook.Sheets[sheetName];
       var rows  = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
       callback(rows, null);
     };
@@ -4199,7 +4204,7 @@ window.PRODUCTO_IMGS = {
       setProgreso(35, 'Procesando filas...', 'Leyendo órdenes del archivo', '');
 
       // Columna de cantidad: nombre de encabezado flexible según el archivo del analista
-      var CANTIDAD_KEYS = ['cantidad', 'unidades', 'cantidad_unidades', 'unidades_orden', 'cantidad_producto', 'unidades_producto', 'quantity', 'cant'];
+      var CANTIDAD_KEYS = ['unidades_vendidas', 'cantidad', 'unidades', 'cantidad_unidades', 'unidades_orden', 'cantidad_producto', 'unidades_producto', 'quantity', 'cant'];
       var cantidadKey = CANTIDAD_KEYS.filter(function(k) { return headerMap[k] !== undefined; })[0];
 
       // Obtener correo del usuario autenticado
