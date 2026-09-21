@@ -3515,7 +3515,7 @@ window.PRODUCTO_IMGS = {
   var SUPA_URL = "https://tjfpnvlnqjfjjgjcjizb.supabase.co";
   var SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c";
   var supa = null;
-  var BD = { tienda: null, productos: [], segmentos: {}, plantillas: {}, nombres: [], ciudades: [], currentProductIndex: 0 };
+  var BD = { tienda: null, productos: [], segmentos: {}, plantillas: {}, nombres: [], ciudades: [], duraciones: {}, currentProductIndex: 0 };
 
   // ── Utilidades ────────────────────────────────────────────
   function formatCOP(n) { return n ? '$' + Math.round(n).toLocaleString('es-CO') : '$0'; }
@@ -3544,6 +3544,80 @@ window.PRODUCTO_IMGS = {
     b.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:#888;display:inline-block;margin-right:5px;"></span>Conectando...';
     t.insertBefore(b, t.firstChild);
   }
+
+  // ── Modal: configurar duración de producto ─────────────────
+  var _duracionProductoActivo = null;
+
+  function crearModalDuracion() {
+    if (document.getElementById('modalDuracionOverlay')) return;
+    var overlay = document.createElement('div');
+    overlay.id = 'modalDuracionOverlay';
+    overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(20,22,30,.45);z-index:9999;align-items:center;justify-content:center;';
+    overlay.innerHTML =
+      '<div style="background:#fff;border-radius:14px;padding:24px;width:360px;max-width:92vw;box-shadow:0 20px 50px rgba(0,0,0,.25);">' +
+        '<div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:2px;">⏱ Configurar Duración</div>' +
+        '<div id="modalDuracionProducto" style="font-size:12.5px;color:var(--gray);margin-bottom:16px;"></div>' +
+        '<label style="display:block;font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Duración del producto o tratamiento (1 unidad) — días</label>' +
+        '<input type="number" min="1" id="inputDuracionDias" placeholder="Ej: 30" ' +
+          'style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:14px;font-family:inherit;">' +
+        '<label style="display:block;font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Duración de la oferta/combo (más de 1 unidad) — días</label>' +
+        '<input type="number" min="1" id="inputDuracionOferta" placeholder="Ej: 90" ' +
+          'style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:8px;font-family:inherit;">' +
+        '<div id="modalDuracionError" style="display:none;color:var(--red,#E5484D);font-size:12px;margin-bottom:8px;"></div>' +
+        '<div style="display:flex;gap:10px;margin-top:12px;">' +
+          '<button type="button" onclick="cerrarModalDuracion()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:700;font-size:13px;cursor:pointer;">Cancelar</button>' +
+          '<button type="button" onclick="confirmarGuardarDuracion()" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--orange);color:#fff;font-weight:700;font-size:13px;cursor:pointer;">Guardar</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+  }
+
+  window.abrirModalDuracion = function(nombreProducto) {
+    crearModalDuracion();
+    _duracionProductoActivo = nombreProducto;
+    document.getElementById('modalDuracionProducto').textContent = nombreProducto;
+    var existente = BD.duraciones && BD.duraciones[nombreProducto];
+    document.getElementById('inputDuracionDias').value = existente ? existente.dias : '';
+    document.getElementById('inputDuracionOferta').value = existente ? existente.oferta : '';
+    var err = document.getElementById('modalDuracionError');
+    err.style.display = 'none';
+    err.textContent = '';
+    document.getElementById('modalDuracionOverlay').style.display = 'flex';
+  };
+
+  window.cerrarModalDuracion = function() {
+    var overlay = document.getElementById('modalDuracionOverlay');
+    if (overlay) overlay.style.display = 'none';
+    _duracionProductoActivo = null;
+  };
+
+  window.confirmarGuardarDuracion = async function() {
+    var err = document.getElementById('modalDuracionError');
+    var dias = parseInt(document.getElementById('inputDuracionDias').value, 10);
+    var oferta = parseInt(document.getElementById('inputDuracionOferta').value, 10);
+
+    if (!dias || dias <= 0 || !oferta || oferta <= 0) {
+      err.textContent = 'Ingresa un número de días válido (mayor a 0) en ambos campos.';
+      err.style.display = 'block';
+      return;
+    }
+
+    var btn = document.querySelector('#modalDuracionOverlay button[onclick="confirmarGuardarDuracion()"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+    var ok = await guardarDuracionProducto(_duracionProductoActivo, dias, oferta);
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+
+    if (!ok) {
+      err.textContent = 'No se pudo guardar. Intenta de nuevo.';
+      err.style.display = 'block';
+      return;
+    }
+
+    window.cerrarModalDuracion();
+    renderizarCarrusel();
+  };
 
   // ── Cargar tienda ─────────────────────────────────────────
   async function cargarTienda() {
@@ -3664,22 +3738,28 @@ window.PRODUCTO_IMGS = {
     // Guardar los clientes en window para acceso desde generarListado
     window._productosData = BD.productos;
 
-    // Renderizar carrusel
+    renderizarCarrusel();
+
+    console.log('[Supabase] ' + BD.productos.length + ' productos cargados desde pedidos reales');
+  }
+
+  // ── Renderizar (o re-renderizar) el carrusel de productos ──
+  function renderizarCarrusel() {
     var track = document.getElementById('productosCarouselTrack');
     var dots  = document.getElementById('productosCarouselDots');
     if (!track) return;
 
+    var activeIndex = BD.currentProductIndex || 0;
+
     track.innerHTML = BD.productos.map(function(p, i) {
-      return renderProductCard(p, i, i === 0);
+      return renderProductCard(p, i, i === activeIndex);
     }).join('');
 
     if (dots) {
       dots.innerHTML = BD.productos.map(function(_, i) {
-        return '<span class="carousel-dot' + (i === 0 ? ' active' : '') + '" data-index="' + i + '" onclick="goToProduct(' + i + ')"></span>';
+        return '<span class="carousel-dot' + (i === activeIndex ? ' active' : '') + '" data-index="' + i + '" onclick="goToProduct(' + i + ')"></span>';
       }).join('');
     }
-
-    console.log('[Supabase] ' + BD.productos.length + ' productos cargados desde pedidos reales');
   }
 
   // ── Renderizar tarjeta de producto ─────────────────────────
@@ -3708,6 +3788,15 @@ window.PRODUCTO_IMGS = {
         'Ver Listado De Clientes</button></div>';
     }).join('');
 
+    var dur = BD.duraciones && BD.duraciones[p.nombre];
+    var durInfo = dur
+      ? '<div style="font-size:11px;color:var(--gray);margin-top:2px;">⏱ Duración: <b style="color:var(--ink);">' + dur.dias + ' días</b> · Oferta: <b style="color:var(--ink);">' + dur.oferta + ' días</b></div>'
+      : '<div style="font-size:11px;color:var(--gray);margin-top:2px;">⏱ Duración sin configurar</div>';
+    var durBtn = '<button type="button" onclick="abrirModalDuracion(\'' + p.nombre.replace(/'/g, "\\'") + '\')" ' +
+      'style="margin-top:8px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 10px;' +
+      'border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:11.5px;font-weight:700;cursor:pointer;">' +
+      '⚙️ ' + (dur ? 'Editar' : 'Configurar') + ' Duración</button>';
+
     return '<div class="prod-card carousel-slide' + (active ? ' active' : '') + '" data-index="' + i + '">' +
       img +
       '<div class="prod-body">' +
@@ -3716,6 +3805,8 @@ window.PRODUCTO_IMGS = {
         prov +
         '<div class="prod-stat-row"><span>Entregados</span><span><b>' + formatNum(p.ordenes) + ' órdenes entregadas</b> ' + formatCOP(p.facturacion) + '</span></div>' +
         '<div class="prod-stat-row"><span>Ganancias</span><span><b style="color:#1E8E5A;">' + formatCOP(p.ganancias) + '</b></span></div>' +
+        durInfo +
+        durBtn +
       '</div>' +
       '<div class="prod-accion-col"><div class="prod-segments">' + segsHtml + '</div></div>' +
     '</div>';
@@ -3757,6 +3848,36 @@ window.PRODUCTO_IMGS = {
     data.forEach(function(s) { BD.segmentos[s.nombre] = [s.dias_min, s.dias_max]; });
     window.SEGMENT_RANGOS = BD.segmentos;
   }
+
+  // ── Cargar duraciones de producto configuradas ────────────
+  async function cargarDuraciones() {
+    if (!supa || !window._usuarioActual) return;
+    var { data } = await supa
+      .from('producto_duraciones')
+      .select('nombre_producto,duracion_dias,duracion_oferta_dias')
+      .eq('dropshipper_id', window._usuarioActual.id);
+    BD.duraciones = {};
+    if (data) {
+      data.forEach(function(d) {
+        BD.duraciones[d.nombre_producto] = { dias: d.duracion_dias, oferta: d.duracion_oferta_dias };
+      });
+    }
+  }
+
+  // ── Guardar duración configurada de un producto ───────────
+  async function guardarDuracionProducto(nombreProducto, duracionDias, duracionOfertaDias) {
+    if (!supa || !window._usuarioActual) return false;
+    var { error } = await supa.from('producto_duraciones').upsert({
+      dropshipper_id: window._usuarioActual.id,
+      nombre_producto: nombreProducto,
+      duracion_dias: duracionDias,
+      duracion_oferta_dias: duracionOfertaDias
+    }, { onConflict: 'dropshipper_id,nombre_producto' });
+    if (error) { console.error('[Supabase] Error guardando duración:', error); return false; }
+    BD.duraciones[nombreProducto] = { dias: duracionDias, oferta: duracionOfertaDias };
+    return true;
+  }
+  window.guardarDuracionProducto = guardarDuracionProducto;
 
   // ── Cargar nombres y ciudades demo ────────────────────────
   async function cargarNombresCiudades() {
@@ -3967,7 +4088,7 @@ window.PRODUCTO_IMGS = {
       var autorizado = await verificarDropshipper(user.id);
       if (!autorizado) return;
       mostrarBtnLogout();
-      await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades()]);
+      await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades(), cargarDuraciones()]);
       await Promise.all([cargarProductos(), cargarAsistentes()]);
       setTimeout(aplicarParches, 500);
       setInterval(aplicarParches, 2500);
@@ -4001,7 +4122,7 @@ window.PRODUCTO_IMGS = {
         if (!autorizado) return;
         mostrarBtnLogout();
         window._usuarioActual = session.user;
-        await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades()]);
+        await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades(), cargarDuraciones()]);
         await Promise.all([cargarProductos(), cargarAsistentes()]);
         setTimeout(aplicarParches, 500);
         setInterval(aplicarParches, 2500);
