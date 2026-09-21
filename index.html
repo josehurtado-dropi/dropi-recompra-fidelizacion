@@ -4546,15 +4546,40 @@ window.PRODUCTO_IMGS = {
 
       setProgreso(85, 'Subiendo datos...', 'Cargando ' + pedidos.length + ' órdenes a Supabase', '');
 
-      // PASO 3: Insertar en lotes de 50
+      // PASO 3: Insertar en lotes de 50, con reintento automático si un lote
+      // falla (ej. por un corte de red momentáneo), para no perder órdenes
+      // en silencio como pasó antes con una falla puntual de un solo lote.
       var BATCH = 50;
+      var MAX_INTENTOS = 3;
       var erroresSubida = 0;
+      var ordenesConError = 0;
+
       for (var b = 0; b < pedidos.length; b += BATCH) {
         var lote = pedidos.slice(b, b + BATCH);
         var pct = 85 + Math.round((b / pedidos.length) * 12);
-        setProgreso(pct, 'Subiendo datos...', 'Lote ' + (Math.floor(b/BATCH)+1) + ' de ' + Math.ceil(pedidos.length/BATCH), '');
-        var { error: errIns } = await supa.from('pedidos').insert(lote);
-        if (errIns) { erroresSubida++; console.error('Error lote:', errIns); }
+        var loteOk = false;
+
+        for (var intento = 1; intento <= MAX_INTENTOS && !loteOk; intento++) {
+          setProgreso(pct, 'Subiendo datos...',
+            'Lote ' + (Math.floor(b / BATCH) + 1) + ' de ' + Math.ceil(pedidos.length / BATCH) +
+            (intento > 1 ? ' (reintento ' + intento + ')' : ''), '');
+
+          var { error: errIns } = await supa.from('pedidos').insert(lote);
+
+          if (!errIns) {
+            loteOk = true;
+          } else {
+            console.error('Error lote (intento ' + intento + '):', errIns);
+            if (intento < MAX_INTENTOS) {
+              await new Promise(function(r) { setTimeout(r, 1000 * intento); });
+            }
+          }
+        }
+
+        if (!loteOk) {
+          erroresSubida++;
+          ordenesConError += lote.length;
+        }
       }
 
       setProgreso(100, '¡Listo!', 'Datos cargados correctamente', '');
@@ -4564,8 +4589,8 @@ window.PRODUCTO_IMGS = {
         ? '✅ <b>' + pedidos.length + ' órdenes</b> cargadas correctamente.<br>' +
           (saltadas > 0 ? '⚪ ' + saltadas + ' filas omitidas (fuera del rango o sin coincidencia).<br>' : '') +
           '<br>El módulo se actualizará con tu información.'
-        : '⚠️ <b>' + (pedidos.length - erroresSubida * BATCH) + ' órdenes</b> cargadas.<br>' +
-          '❌ ' + erroresSubida + ' lotes con error. Intenta de nuevo si falta información.';
+        : '⚠️ <b>' + (pedidos.length - ordenesConError) + ' órdenes</b> cargadas.<br>' +
+          '❌ ' + ordenesConError + ' órdenes con error tras varios intentos. Intenta subir el archivo de nuevo.';
 
       mostrarResultado(true, resumen);
     });
