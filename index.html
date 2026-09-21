@@ -3558,11 +3558,12 @@ window.PRODUCTO_IMGS = {
         '<div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:2px;">⚙️ Configuración de la Campaña</div>' +
         '<div id="modalDuracionProducto" style="font-size:12.5px;color:var(--gray);margin-bottom:16px;"></div>' +
         '<label style="display:block;font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Duración del producto o tratamiento (1 unidad) — días</label>' +
-        '<input type="number" min="1" id="inputDuracionDias" placeholder="Ej: 30" ' +
+        '<input type="number" min="0" id="inputDuracionDias" placeholder="Ej: 30" ' +
           'style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:14px;font-family:inherit;">' +
         '<label style="display:block;font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Duración de la oferta/combo (más de 1 unidad) — días</label>' +
-        '<input type="number" min="1" id="inputDuracionOferta" placeholder="Ej: 90" ' +
+        '<input type="number" min="0" id="inputDuracionOferta" placeholder="Ej: 90" ' +
           'style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:8px;font-family:inherit;">' +
+        '<div style="font-size:11px;color:var(--gray);margin-bottom:8px;">Coloca <b>0</b> en ambos campos para quitar la configuración y volver a la segmentación por fecha de compra.</div>' +
         '<div id="modalDuracionError" style="display:none;color:var(--red,#E5484D);font-size:12px;margin-bottom:8px;"></div>' +
         '<div style="display:flex;gap:10px;margin-top:12px;">' +
           '<button type="button" onclick="cerrarModalDuracion()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:700;font-size:13px;cursor:pointer;">Cancelar</button>' +
@@ -3593,30 +3594,40 @@ window.PRODUCTO_IMGS = {
 
   window.confirmarGuardarDuracion = async function() {
     var err = document.getElementById('modalDuracionError');
-    var dias = parseInt(document.getElementById('inputDuracionDias').value, 10);
-    var oferta = parseInt(document.getElementById('inputDuracionOferta').value, 10);
+    var valDias = document.getElementById('inputDuracionDias').value;
+    var valOferta = document.getElementById('inputDuracionOferta').value;
+    var dias = parseInt(valDias, 10);
+    var oferta = parseInt(valOferta, 10);
+    err.style.display = 'none';
+    err.textContent = '';
 
-    if (!dias || dias <= 0 || !oferta || oferta <= 0) {
-      err.textContent = 'Ingresa un número de días válido (mayor a 0) en ambos campos.';
+    // 0 en ambos campos = quitar la configuración y volver a la
+    // segmentación original (por fecha de compra).
+    var esReset = valDias.trim() === '0' && valOferta.trim() === '0';
+
+    if (!esReset && (!dias || dias <= 0 || !oferta || oferta <= 0)) {
+      err.textContent = 'Ingresa un número de días válido (mayor a 0) en ambos campos, o 0 en ambos para quitar la configuración.';
       err.style.display = 'block';
       return;
     }
 
     var btn = document.querySelector('#modalDuracionOverlay button[onclick="confirmarGuardarDuracion()"]');
-    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+    if (btn) { btn.disabled = true; btn.textContent = esReset ? 'Quitando...' : 'Guardando...'; }
 
-    var ok = await guardarDuracionProducto(_duracionProductoActivo, dias, oferta);
+    var ok = esReset
+      ? await eliminarDuracionProducto(_duracionProductoActivo)
+      : await guardarDuracionProducto(_duracionProductoActivo, dias, oferta);
 
     if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
 
     if (!ok) {
-      err.textContent = 'No se pudo guardar. Intenta de nuevo.';
+      err.textContent = 'No se pudo ' + (esReset ? 'quitar la configuración' : 'guardar') + '. Intenta de nuevo.';
       err.style.display = 'block';
       return;
     }
 
     window.cerrarModalDuracion();
-    renderizarCarrusel();
+    await cargarProductos(); // recalcula la segmentación (agotamiento u original) con la config actualizada
   };
 
   // ── Cargar tienda ─────────────────────────────────────────
@@ -3758,8 +3769,11 @@ window.PRODUCTO_IMGS = {
     });
 
     // Convertir a array y ordenar por órdenes entregadas (mayor a menor)
+    var indicePrevio = BD.currentProductIndex || 0;
     BD.productos = Object.values(productosMap).sort(function(a, b) { return b.ordenes - a.ordenes; });
-    BD.currentProductIndex = 0;
+    // Conservar la posición del carrusel si ya había una (ej: al recargar tras
+    // configurar/editar/quitar una campaña), en vez de saltar siempre al inicio.
+    BD.currentProductIndex = Math.min(indicePrevio, Math.max(BD.productos.length - 1, 0));
 
     // Guardar los clientes en window para acceso desde generarListado
     window._productosData = BD.productos;
@@ -3920,6 +3934,20 @@ window.PRODUCTO_IMGS = {
     return true;
   }
   window.guardarDuracionProducto = guardarDuracionProducto;
+
+  // ── Quitar duración configurada (vuelve a la segmentación por fecha de compra) ──
+  async function eliminarDuracionProducto(nombreProducto) {
+    if (!supa || !window._usuarioActual) return false;
+    var { error } = await supa
+      .from('producto_duraciones')
+      .delete()
+      .eq('dropshipper_id', window._usuarioActual.id)
+      .eq('nombre_producto', nombreProducto);
+    if (error) { console.error('[Supabase] Error quitando duración:', error); return false; }
+    delete BD.duraciones[nombreProducto];
+    return true;
+  }
+  window.eliminarDuracionProducto = eliminarDuracionProducto;
 
   // ── Cargar nombres y ciudades demo ────────────────────────
   async function cargarNombresCiudades() {
