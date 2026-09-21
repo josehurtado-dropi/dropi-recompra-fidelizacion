@@ -3814,7 +3814,10 @@ window.PRODUCTO_IMGS = {
     // Listado adicional sin filtrar por rango: todos los que compraron y
     // recibieron el pedido (la suma de los segmentos no da el total porque
     // son ventanas de tiempo específicas; este listado sí trae a todos).
-    segmentos.push({ label: 'Clientes Compradores Que Recibieron El Pedido', key: 'todos_clientes', cnt: p.todos_clientes.length });
+    // Solo aparece si el producto tiene Campaña configurada.
+    if (dur) {
+      segmentos.push({ label: 'Clientes Compradores Que Recibieron El Pedido', key: 'todos_clientes', cnt: p.todos_clientes.length });
+    }
 
     var segsHtml = segmentos.map(function(seg) {
       return '<div class="segment-row">' +
