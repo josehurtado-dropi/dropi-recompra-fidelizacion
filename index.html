@@ -3170,6 +3170,7 @@ document.addEventListener('DOMContentLoaded', function() {
       '<th><div class="th-flex">TELÉFONO</div></th>' +
       '<th><div class="th-flex">ESTATUS</div></th>' +
       '<th><div class="th-flex">TIPO DE ENVÍO</div></th>' +
+      '<th><div class="th-flex">UNIDADES</div></th>' +
       '<th><div class="th-flex">TOTAL DE ORDEN</div></th>' +
       '<th><div class="th-flex">PRECIO FLETE</div></th>' +
       '<th><div class="th-flex">DEPARTAMENTO</div></th>' +
@@ -3404,21 +3405,21 @@ document.addEventListener('DOMContentLoaded', function() {
         'setTimeout(function(){' +
           'try {' +
             'var trs = document.querySelectorAll("#cdTableBody tr");' +
-            'var data = [["Nombre Cliente","Teléfono","Estatus","Tipo de Envío","Total De Orden","Precio Flete","Departamento","Ciudad","Transportadora","Producto","Fecha Último Movimiento"]];' +
+            'var data = [["Nombre Cliente","Teléfono","Estatus","Tipo de Envío","Unidades","Total De Orden","Precio Flete","Departamento","Ciudad","Transportadora","Producto","Fecha Último Movimiento"]];' +
             'trs.forEach(function(tr){' +
               'var cb = tr.querySelector(".cd-row-check");' +
               'if(cb && cb.checked){' +
                 'var tds = tr.querySelectorAll("td");' +
                 'data.push([' +
                   'tds[1].textContent.trim(), tds[2].textContent.trim(), "ENTREGADO CON RECAUDO",' +
-                  'tds[4].textContent.trim(), tds[5].textContent.trim(), tds[6].textContent.trim(),' +
-                  'tds[7].textContent.trim(), tds[8].textContent.trim(), tds[9].textContent.trim(),' +
-                  'tds[10].textContent.trim(), tds[11].textContent.trim()' +
+                  'tds[4].textContent.trim(), tds[5].textContent.trim(), tds[6].textContent.trim(), tds[7].textContent.trim(),' +
+                  'tds[8].textContent.trim(), tds[9].textContent.trim(), tds[10].textContent.trim(),' +
+                  'tds[11].textContent.trim(), tds[12].textContent.trim()' +
                 ']);' +
               '}' +
             '});' +
             'var ws = XLSXref.utils.aoa_to_sheet(data);' +
-            'ws["!cols"] = [{wch:26},{wch:14},{wch:22},{wch:14},{wch:13},{wch:13},{wch:16},{wch:16},{wch:16},{wch:34},{wch:14}];' +
+            'ws["!cols"] = [{wch:26},{wch:14},{wch:22},{wch:14},{wch:11},{wch:13},{wch:13},{wch:16},{wch:16},{wch:16},{wch:34},{wch:14}];' +
             'var wb = XLSXref.utils.book_new();' +
             'XLSXref.utils.book_append_sheet(wb, ws, "Lista Clientes");' +
             'var wbout = XLSXref.write(wb, {bookType:"xlsx", type:"array"});' +
@@ -3519,6 +3520,7 @@ window.PRODUCTO_IMGS = {
   // ── Utilidades ────────────────────────────────────────────
   function formatCOP(n) { return n ? '$' + Math.round(n).toLocaleString('es-CO') : '$0'; }
   function formatNum(n) { return n ? Math.round(n).toLocaleString('es-CO') : '0'; }
+  function primerNombre(nombreCompleto) { return String(nombreCompleto || '').trim().split(/\s+/)[0] || ''; }
 
   // ── Badge de conexión ─────────────────────────────────────
   function setBadge(estado) {
@@ -3576,7 +3578,7 @@ window.PRODUCTO_IMGS = {
     while (_more) {
       var _pg = await supa
         .from('pedidos')
-        .select('id_producto,nombre_producto,nombre_proveedor,url_foto_producto,valor_orden,costo_proveedor,precio_flete,ganancia,fecha_entrega,nombre_cliente,telefono_cliente,ciudad,departamento,transportadora,tipo_envio')
+        .select('id_producto,nombre_producto,nombre_proveedor,url_foto_producto,valor_orden,costo_proveedor,precio_flete,ganancia,fecha_entrega,nombre_cliente,telefono_cliente,ciudad,departamento,transportadora,tipo_envio,cantidad')
         .eq('estado_orden', 'ENTREGADO')
         .gte('fecha_entrega', hace365Str)
         .order('fecha_entrega', { ascending: false })
@@ -3644,6 +3646,7 @@ window.PRODUCTO_IMGS = {
               departamento:  p.departamento,
               transportadora: p.transportadora,
               tipo_envio:    p.tipo_envio,
+              cantidad:      p.cantidad,
               valor_orden:   p.valor_orden,
               precio_flete:  p.precio_flete,
               fecha_entrega: p.fecha_entrega
@@ -3827,10 +3830,11 @@ window.PRODUCTO_IMGS = {
         clientesReales.forEach(function(c) {
           rows += '<tr>' +
             '<td><input type="checkbox" class="cd-checkbox cd-row-check" checked onclick="updateCdCount()"></td>' +
-            '<td>' + (c.nombre || '') + '</td>' +
+            '<td>' + primerNombre(c.nombre) + '</td>' +
             '<td>' + (c.telefono || '') + '</td>' +
             '<td><span class="status-pill">ENTREGADO</span></td>' +
             '<td>' + (c.tipo_envio || 'CON RECAUDO') + '</td>' +
+            '<td>' + (c.cantidad || 1) + '</td>' +
             '<td>' + (c.valor_orden ? '$' + Math.round(c.valor_orden).toLocaleString('es-CO') : '$0') + '</td>' +
             '<td><b style="color:#26272B;">' + (c.precio_flete ? '$' + Math.round(c.precio_flete).toLocaleString('es-CO') : '$0') + '</b></td>' +
             '<td>' + (c.departamento || '') + '</td>' +
@@ -4194,6 +4198,10 @@ window.PRODUCTO_IMGS = {
 
       setProgreso(35, 'Procesando filas...', 'Leyendo órdenes del archivo', '');
 
+      // Columna de cantidad: nombre de encabezado flexible según el archivo del analista
+      var CANTIDAD_KEYS = ['cantidad', 'unidades', 'cantidad_unidades', 'unidades_orden', 'cantidad_producto', 'unidades_producto', 'quantity', 'cant'];
+      var cantidadKey = CANTIDAD_KEYS.filter(function(k) { return headerMap[k] !== undefined; })[0];
+
       // Obtener correo del usuario autenticado
       var correoUsuario = window._usuarioActual ? window._usuarioActual.email : null;
       if (!correoUsuario) {
@@ -4251,6 +4259,7 @@ window.PRODUCTO_IMGS = {
           ciudad:               headerMap['ciudad'] !== undefined ? String(row[headerMap['ciudad']] || '').trim().toUpperCase() : '',
           transportadora:       headerMap['transportadora'] !== undefined ? String(row[headerMap['transportadora']] || '').trim().toUpperCase() : '',
           tipo_envio:           headerMap['tipo_envio'] !== undefined ? String(row[headerMap['tipo_envio']] || '').trim().toUpperCase() : 'CON RECAUDO',
+          cantidad:             cantidadKey ? (parseInt(String(row[headerMap[cantidadKey]] || '1').replace(/[^0-9]/g,''), 10) || 1) : 1,
         });
       }
 
