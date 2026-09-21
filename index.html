@@ -3700,6 +3700,7 @@ window.PRODUCTO_IMGS = {
           ordenes:           0,
           facturacion:       0,
           ganancias:         0,
+          todos_clientes:    [], // todos los compradores que recibieron el pedido, sin filtrar por rango
           // Con Campaña configurada: seg1 = a 5 días de agotarse, seg2 = se agotó hace 1 mes, seg3 = se agotó hace 2+ meses.
           // Sin Campaña configurada: seg1 = 1-30 días desde la compra, seg2 = 31-60, seg3 = 61-365 (comportamiento anterior).
           seg1_clientes:     [],
@@ -3725,6 +3726,8 @@ window.PRODUCTO_IMGS = {
               precio_flete:  p.precio_flete,
               fecha_entrega: p.fecha_entrega
             };
+
+      prod.todos_clientes.push(cliente);
 
       // Segmentación: si el producto tiene "Campaña" configurada (duración
       // del producto/oferta en días), se segmenta por fecha estimada de
@@ -3807,6 +3810,11 @@ window.PRODUCTO_IMGS = {
       { label: 'Compradores 2 Meses Anteriores',  key: 'seg2_clientes', cnt: p.seg2_clientes.length },
       { label: 'Compradores Desde 3 Hasta 1 Año', key: 'seg3_clientes', cnt: p.seg3_clientes.length },
     ];
+
+    // Listado adicional sin filtrar por rango: todos los que compraron y
+    // recibieron el pedido (la suma de los segmentos no da el total porque
+    // son ventanas de tiempo específicas; este listado sí trae a todos).
+    segmentos.push({ label: 'Clientes Compradores Que Recibieron El Pedido', key: 'todos_clientes', cnt: p.todos_clientes.length });
 
     var segsHtml = segmentos.map(function(seg) {
       return '<div class="segment-row">' +
