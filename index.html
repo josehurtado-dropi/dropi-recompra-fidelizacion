@@ -4505,24 +4505,45 @@ window.PRODUCTO_IMGS = {
 
       setProgreso(75, 'Obteniendo perfil...', 'Verificando tu cuenta', '');
 
-      // PASO 2: Obtener el dropshipper_id del usuario autenticado
-      var dropshipperId = null;
-      var { data: dsData } = await supa
+      // PASO 2: Obtener o crear el perfil de dropshipper del usuario autenticado.
+      // El id del dropshipper DEBE ser el mismo id de autenticación (auth.uid()),
+      // porque las políticas de seguridad (RLS) de pedidos/campañas/productos
+      // exigen dropshipper_id = auth.uid(). Antes este id no se fijaba al crear
+      // el perfil, así que un dropshipper nuevo nunca podía subir datos.
+      var dropshipperId = window._usuarioActual ? window._usuarioActual.id : null;
+
+      if (!dropshipperId) {
+        mostrarResultado(false, '❌ No se pudo identificar tu sesión. Cierra sesión e ingresa de nuevo.');
+        return;
+      }
+
+      var { data: dsData, error: errDsSelect } = await supa
         .from('dropshippers')
         .select('id')
-        .eq('email', correoUsuario)
-        .limit(1)
-        .single();
+        .eq('id', dropshipperId)
+        .maybeSingle();
 
-      if (dsData) {
-        dropshipperId = dsData.id;
-      } else {
-        // Si no existe en dropshippers, crearlo
-        var { data: newDs } = await supa
+      if (errDsSelect) {
+        mostrarResultado(false, '❌ Error verificando tu perfil: ' + errDsSelect.message);
+        return;
+      }
+
+      if (!dsData) {
+        // No existe todavía: crear el perfil con el mismo id de autenticación
+        var { error: errDsInsert } = await supa
           .from('dropshippers')
-          .insert({ nombre: correoUsuario.split('@')[0], email: correoUsuario, tienda_nombre: 'Mi Tienda', activo: true })
-          .select().single();
-        if (newDs) dropshipperId = newDs.id;
+          .insert({
+            id: dropshipperId,
+            nombre: correoUsuario.split('@')[0],
+            email: correoUsuario,
+            tienda_nombre: 'Mi Tienda',
+            activo: true
+          });
+
+        if (errDsInsert) {
+          mostrarResultado(false, '❌ No se pudo crear tu perfil de dropshipper: ' + errDsInsert.message);
+          return;
+        }
       }
 
       // Asignar dropshipper_id a todos los pedidos
