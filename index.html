@@ -4460,6 +4460,16 @@ window.PRODUCTO_IMGS = {
         });
       }
 
+      // Eliminar duplicados por id_orden (se han visto exportaciones con la
+      // misma orden repetida). Si no se filtran aquí, una sola fila repetida
+      // hace fallar el lote de 50 completo por la restricción única de la
+      // base de datos (correo_dropshipper, id_orden), perdiendo en silencio
+      // hasta 49 órdenes válidas junto con ella.
+      var pedidosPorOrden = {};
+      pedidos.forEach(function(p) { pedidosPorOrden[p.id_orden] = p; });
+      var duplicados = pedidos.length - Object.keys(pedidosPorOrden).length;
+      pedidos = Object.values(pedidosPorOrden);
+
       if (pedidos.length === 0) {
         mostrarResultado(false,
           '⚠️ No se encontraron órdenes válidas.<br><br>' +
@@ -4588,6 +4598,7 @@ window.PRODUCTO_IMGS = {
       var resumen = erroresSubida === 0
         ? '✅ <b>' + pedidos.length + ' órdenes</b> cargadas correctamente.<br>' +
           (saltadas > 0 ? '⚪ ' + saltadas + ' filas omitidas (fuera del rango o sin coincidencia).<br>' : '') +
+          (duplicados > 0 ? '⚪ ' + duplicados + ' filas duplicadas (misma orden repetida en el archivo).<br>' : '') +
           '<br>El módulo se actualizará con tu información.'
         : '⚠️ <b>' + (pedidos.length - ordenesConError) + ' órdenes</b> cargadas.<br>' +
           '❌ ' + ordenesConError + ' órdenes con error tras varios intentos. Intenta subir el archivo de nuevo.';
