@@ -2968,7 +2968,8 @@ document.addEventListener('DOMContentLoaded', function() {
         'var html = "";' +
         'CLIENTES.forEach(function(c, i){' +
           'var m = plantilla.replace(/\\[Nombre\\]/g, c.n).replace(/\\[Producto\\]/g, PRODUCTO_NOMBRE);' +
-          'var tel = "57" + c.t.replace(/[^0-9]/g, "");' +
+          'var telDigitos = c.t.replace(/[^0-9]/g, "");' +
+          'var tel = (telDigitos.length > 10 && telDigitos.indexOf("57") === 0) ? telDigitos : "57" + telDigitos;' +
           'var link = "https://wa.me/" + tel + "?text=" + encodeURIComponent(m);' +
           'html += "<div class=\\"wa-row\\" id=\\"waRow" + i + "\\">" +' +
             '"<div><div class=\\"wa-row-name\\">" + c.n + "</div><div class=\\"wa-row-phone\\">" + c.t + "</div></div>" +' +
@@ -3388,7 +3389,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'var segmentoSlug = "' + segmento.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\\s]+/g, "").trim().replace(/\\s+/g, "_") + '";' +
         'var now = new Date();' +
         'var fecha = now.getFullYear() + "-" + padN(now.getMonth()+1) + "-" + padN(now.getDate());' +
-        'var fileName = productoSlug + "_" + accionSlug + "_" + segmentoSlug + "_" + fecha + ".xlsx";' +
+        'var fileName = productoSlug + "_" + accionSlug + "_" + segmentoSlug + "_" + fecha + ".csv";' +
         'var folder = accionSeleccionada ? ("Campaña de " + (accionSeleccionada === "VENTA CRUZADA" ? "Venta Cruzada" : "Recompra")) : "Listas de Clientes";' +
         'var overlay = document.getElementById("saveToastOverlay");' +
         'var box = document.getElementById("saveToastBox");' +
@@ -3414,11 +3415,8 @@ document.addEventListener('DOMContentLoaded', function() {
               '}' +
             '});' +
             'var ws = XLSXref.utils.aoa_to_sheet(data);' +
-            'ws["!cols"] = [{wch:26},{wch:14},{wch:22},{wch:14},{wch:11},{wch:13},{wch:13},{wch:16},{wch:16},{wch:16},{wch:34},{wch:14}];' +
-            'var wb = XLSXref.utils.book_new();' +
-            'XLSXref.utils.book_append_sheet(wb, ws, "Lista Clientes");' +
-            'var wbout = XLSXref.write(wb, {bookType:"xlsx", type:"array"});' +
-            'var blob = new Blob([wbout], {type:"application/octet-stream"});' +
+            'var csvOut = XLSXref.utils.sheet_to_csv(ws, {FS:","});' +
+            'var blob = new Blob(["\\uFEFF" + csvOut], {type:"text/csv;charset=utf-8;"});' +
             'var url = URL.createObjectURL(blob);' +
             'var a = document.createElement("a");' +
             'a.href = url;' +
@@ -3516,6 +3514,11 @@ window.PRODUCTO_IMGS = {
   function formatCOP(n) { return n ? '$' + Math.round(n).toLocaleString('es-CO') : '$0'; }
   function formatNum(n) { return n ? Math.round(n).toLocaleString('es-CO') : '0'; }
   function primerNombre(nombreCompleto) { return String(nombreCompleto || '').trim().split(/\s+/)[0] || ''; }
+  function formatTelefonoCO(tel) {
+    var digitos = String(tel || '').replace(/\D/g, '');
+    if (digitos.length > 10 && digitos.indexOf('57') === 0) digitos = digitos.slice(2);
+    return digitos ? '+57 ' + digitos : '';
+  }
 
   // ── Badge de conexión ─────────────────────────────────────
   function setBadge(estado) {
@@ -4023,7 +4026,7 @@ window.PRODUCTO_IMGS = {
           rows += '<tr>' +
             '<td><input type="checkbox" class="cd-checkbox cd-row-check" checked onclick="updateCdCount()"></td>' +
             '<td>' + primerNombre(c.nombre) + '</td>' +
-            '<td>' + (c.telefono || '') + '</td>' +
+            '<td>' + formatTelefonoCO(c.telefono) + '</td>' +
             '<td><span class="status-pill">ENTREGADO</span></td>' +
             '<td>' + (c.tipo_envio || 'CON RECAUDO') + '</td>' +
             '<td>' + (c.cantidad || 1) + '</td>' +
