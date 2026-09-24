@@ -3162,6 +3162,14 @@ document.addEventListener('DOMContentLoaded', function() {
         '<div id="waSubflowSeleccionado" style="display:none;font-size:12px;color:#1E8E5A;font-weight:700;margin-bottom:10px;padding:8px 10px;background:#E8F5EE;border-radius:8px;"></div>' +
         '<div id="waSubflowResultados" style="max-height:240px;overflow-y:auto;"></div>' +
       '</div>' +
+      '<div class="wa-plantilla-card" id="waMediaCard" style="display:none;background:#fff;border:1px solid #ECEDF0;border-radius:12px;padding:16px;margin:16px 0;">' +
+        '<div style="font-size:14px;font-weight:800;color:#1B1D23;margin-bottom:6px;">🖼️ Imagen del encabezado (la misma que subiste en ChateaPro al crear esta plantilla)</div>' +
+        '<div style="font-size:11.5px;color:#6B7280;margin-bottom:10px;">Búscala por nombre de archivo o elige de las más recientes.</div>' +
+        '<input type="text" id="waMediaBuscar" placeholder="Buscar imagen por nombre de archivo..." oninput="filtrarMediaWA()" autocomplete="off" ' +
+          'style="width:100%;padding:9px 12px;border:1px solid #ECEDF0;border-radius:8px;font-size:13px;font-family:inherit;margin-bottom:8px;box-sizing:border-box;">' +
+        '<div id="waMediaSeleccionada" style="display:none;font-size:12px;color:#1E8E5A;font-weight:700;margin-bottom:10px;padding:8px 10px;background:#E8F5EE;border-radius:8px;align-items:center;gap:10px;"></div>' +
+        '<div id="waMediaResultados" style="max-height:280px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:8px;"></div>' +
+      '</div>' +
       '<div class="cd-footer-row">' +
       '<div class="footer-actions">' +
       '<button class="cta-green" onclick="irAEnviarMensajes()">' +
@@ -3424,12 +3432,22 @@ document.addEventListener('DOMContentLoaded', function() {
           '"<span onclick=\\"quitarPlantillaSeleccionadaWA()\\" title=\\"Quitar selección\\" style=\\"cursor:pointer;font-weight:800;color:#1E8E5A;flex-shrink:0;\\">✕</span>";' +
         'document.getElementById("waPlantillaBuscar").value = "";' +
         'document.getElementById("waPlantillaResultados").innerHTML = "";' +
+        'var mediaCard = document.getElementById("waMediaCard");' +
+        'if(_plantillaSeleccionadaWA.hasImage){' +
+          'mediaCard.style.display = "block";' +
+          'if(!_mediaWA.length){ cargarMediaWA(); }' +
+        '} else {' +
+          'mediaCard.style.display = "none";' +
+          'quitarMediaSeleccionadaWA();' +
+        '}' +
       '}' +
       'function quitarPlantillaSeleccionadaWA(){' +
         '_plantillaSeleccionadaWA = null;' +
         'var el = document.getElementById("waPlantillaSeleccionada");' +
         'el.style.display = "none";' +
         'el.innerHTML = "";' +
+        'document.getElementById("waMediaCard").style.display = "none";' +
+        'quitarMediaSeleccionadaWA();' +
       '}' +
       'var _subflowsWA = [];' +
       'var _subflowSeleccionadoWA = null;' +
@@ -3470,6 +3488,52 @@ document.addEventListener('DOMContentLoaded', function() {
       'function quitarSubflowSeleccionadoWA(){' +
         '_subflowSeleccionadoWA = null;' +
         'var el = document.getElementById("waSubflowSeleccionado");' +
+        'el.style.display = "none";' +
+        'el.innerHTML = "";' +
+      '}' +
+      'var _mediaWA = [];' +
+      'var _mediaSeleccionadaWA = null;' +
+      'function cargarMediaWA(){' +
+        'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
+          'method: "POST",' +
+          'headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c", "Content-Type": "application/json" },' +
+          'body: JSON.stringify({action:"list_media"})' +
+        '}).then(function(r){ return r.json(); }).then(function(data){' +
+          '_mediaWA = data.media || [];' +
+          'renderMediaGridWA(_mediaWA.slice(0,24));' +
+        '}).catch(function(err){ console.error("Error cargando biblioteca de medios:", err); });' +
+      '}' +
+      'function renderMediaGridWA(lista){' +
+        'var cont = document.getElementById("waMediaResultados");' +
+        'if(!lista.length){ cont.innerHTML = "<div style=\\"padding:10px;font-size:12.5px;color:#9CA3AF;\\">No se encontraron imágenes con ese nombre.</div>"; return; }' +
+        'cont.innerHTML = lista.map(function(m){' +
+          'var idx = _mediaWA.indexOf(m);' +
+          'return "<div onclick=\\"seleccionarMediaWA(" + idx + ")\\" title=\\"" + m.name + "\\" style=\\"width:72px;height:72px;border:1px solid #ECEDF0;border-radius:8px;overflow:hidden;cursor:pointer;\\">" +' +
+            '"<img src=\\"" + m.url + "\\" style=\\"width:100%;height:100%;object-fit:cover;display:block;\\">" +' +
+          '"</div>";' +
+        '}).join("");' +
+      '}' +
+      'function filtrarMediaWA(){' +
+        'var q = document.getElementById("waMediaBuscar").value.trim().toLowerCase();' +
+        'if(!q){ renderMediaGridWA(_mediaWA.slice(0,24)); return; }' +
+        'var resultados = _mediaWA.filter(function(m){ return (m.name||"").toLowerCase().indexOf(q) >= 0; });' +
+        'renderMediaGridWA(resultados);' +
+      '}' +
+      'function seleccionarMediaWA(idx){' +
+        '_mediaSeleccionadaWA = _mediaWA[idx];' +
+        'var el = document.getElementById("waMediaSeleccionada");' +
+        'el.style.display = "flex";' +
+        'el.style.alignItems = "center";' +
+        'el.style.justifyContent = "space-between";' +
+        'el.style.gap = "10px";' +
+        'el.innerHTML = "<span style=\\"display:flex;align-items:center;gap:8px;\\"><img src=\\"" + _mediaSeleccionadaWA.url + "\\" style=\\"width:28px;height:28px;object-fit:cover;border-radius:4px;\\">✅ Imagen seleccionada: " + _mediaSeleccionadaWA.name + "</span>" +' +
+          '"<span onclick=\\"quitarMediaSeleccionadaWA()\\" title=\\"Quitar selección\\" style=\\"cursor:pointer;font-weight:800;color:#1E8E5A;flex-shrink:0;\\">✕</span>";' +
+        'document.getElementById("waMediaBuscar").value = "";' +
+        'document.getElementById("waMediaResultados").innerHTML = "";' +
+      '}' +
+      'function quitarMediaSeleccionadaWA(){' +
+        '_mediaSeleccionadaWA = null;' +
+        'var el = document.getElementById("waMediaSeleccionada");' +
         'el.style.display = "none";' +
         'el.innerHTML = "";' +
       '}' +
@@ -3543,12 +3607,16 @@ document.addEventListener('DOMContentLoaded', function() {
           'alert("Selecciona al menos un cliente de la lista (casilla de verificación) antes de ejecutar la campaña.");' +
           'return;' +
         '}' +
+        'if(_plantillaSeleccionadaWA.hasImage && !_mediaSeleccionadaWA){' +
+          'alert("Esta plantilla tiene imagen. Selecciona la imagen del encabezado en la sección \\"🖼️ Imagen del encabezado\\" antes de continuar.");' +
+          'return;' +
+        '}' +
         'if(!confirm("Se enviará la plantilla \\"" + _plantillaSeleccionadaWA.name + "\\" a " + contactos.length + " cliente(s). ¿Deseas continuar?")){ return; }' +
         'mostrarOverlayCampanaWA("cargando", contactos.length);' +
         'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
           'method: "POST",' +
           'headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c", "Content-Type": "application/json" },' +
-          'body: JSON.stringify({ action: "send_campaign", templateName: _plantillaSeleccionadaWA.name, subFlowNs: (_subflowSeleccionadoWA ? _subflowSeleccionadoWA.subFlowNs : null), contactos: contactos })' +
+          'body: JSON.stringify({ action: "send_campaign", templateName: _plantillaSeleccionadaWA.name, subFlowNs: (_subflowSeleccionadoWA ? _subflowSeleccionadoWA.subFlowNs : null), headerImageUrl: (_mediaSeleccionadaWA ? _mediaSeleccionadaWA.url : null), contactos: contactos })' +
         '}).then(function(r){ return r.json(); }).then(function(data){' +
           'if(data.error){ mostrarOverlayCampanaWA("error", 0, data.error); return; }' +
           'mostrarOverlayCampanaWA("resultado", 0, null, data.resultados || []);' +
