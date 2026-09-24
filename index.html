@@ -4018,6 +4018,19 @@ window.PRODUCTO_IMGS = {
         } else {
           clientesReales = prodData.seg3_clientes;
         }
+
+        // FASE 1 — Contactos de prueba fijos para validar el envío real por
+        // WhatsApp (integración ChateaPro) antes de usarlo con clientes
+        // reales. Siempre aparecen como las 2 primeras filas de cualquier
+        // listado; el resto de los contactos sigue siendo el real. Se
+        // seleccionan/deseleccionan igual que cualquier otro, con el check
+        // de la fila.
+        var CONTACTOS_PRUEBA = [
+          { nombre: 'Jose', telefono: '3176703196', ciudad: '', departamento: '', transportadora: '', tipo_envio: '', cantidad: 1, valor_orden: 0, precio_flete: 0, fecha_entrega: '' },
+          { nombre: 'John', telefono: '3164228458', ciudad: '', departamento: '', transportadora: '', tipo_envio: '', cantidad: 1, valor_orden: 0, precio_flete: 0, fecha_entrega: '' }
+        ];
+        clientesReales = CONTACTOS_PRUEBA.concat(clientesReales);
+
         window._campanaActiva.clientes = clientesReales;
 
         // Construir filas con datos REALES (sin aleatorios)
