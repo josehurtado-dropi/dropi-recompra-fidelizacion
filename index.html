@@ -3561,7 +3561,10 @@ window.PRODUCTO_IMGS = {
         '<label style="display:block;font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Duración de la oferta/combo (más de 1 unidad) — días</label>' +
         '<input type="number" min="0" id="inputDuracionOferta" placeholder="Ej: 90" ' +
           'style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:8px;font-family:inherit;">' +
-        '<div style="font-size:11px;color:var(--gray);margin-bottom:8px;">Coloca <b>0</b> en ambos campos para quitar la configuración y volver a la segmentación por fecha de compra.</div>' +
+        '<div style="font-size:11px;color:var(--gray);margin-bottom:14px;">Coloca <b>0</b> en ambos campos para quitar la configuración y volver a la segmentación por fecha de compra.</div>' +
+        '<label style="display:block;font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Plantilla de WhatsApp en ChateaPro (opcional por ahora)</label>' +
+        '<input type="text" id="inputPlantillaWhatsapp" placeholder="Ej: recompra_piston_3m_1ano_variante2" ' +
+          'style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:8px;font-family:inherit;">' +
         '<div id="modalDuracionError" style="display:none;color:var(--red,#E5484D);font-size:12px;margin-bottom:8px;"></div>' +
         '<div style="display:flex;gap:10px;margin-top:12px;">' +
           '<button type="button" onclick="cerrarModalDuracion()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:700;font-size:13px;cursor:pointer;">Cancelar</button>' +
@@ -3578,6 +3581,7 @@ window.PRODUCTO_IMGS = {
     var existente = BD.duraciones && BD.duraciones[nombreProducto];
     document.getElementById('inputDuracionDias').value = existente ? existente.dias : '';
     document.getElementById('inputDuracionOferta').value = existente ? existente.oferta : '';
+    document.getElementById('inputPlantillaWhatsapp').value = existente && existente.plantilla ? existente.plantilla : '';
     var err = document.getElementById('modalDuracionError');
     err.style.display = 'none';
     err.textContent = '';
@@ -3594,6 +3598,7 @@ window.PRODUCTO_IMGS = {
     var err = document.getElementById('modalDuracionError');
     var valDias = document.getElementById('inputDuracionDias').value;
     var valOferta = document.getElementById('inputDuracionOferta').value;
+    var plantilla = document.getElementById('inputPlantillaWhatsapp').value.trim();
     var dias = parseInt(valDias, 10);
     var oferta = parseInt(valOferta, 10);
     err.style.display = 'none';
@@ -3614,7 +3619,7 @@ window.PRODUCTO_IMGS = {
 
     var ok = esReset
       ? await eliminarDuracionProducto(_duracionProductoActivo)
-      : await guardarDuracionProducto(_duracionProductoActivo, dias, oferta);
+      : await guardarDuracionProducto(_duracionProductoActivo, dias, oferta, plantilla);
 
     if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
 
@@ -3908,27 +3913,28 @@ window.PRODUCTO_IMGS = {
     if (!supa || !window._usuarioActual) return;
     var { data } = await supa
       .from('producto_duraciones')
-      .select('nombre_producto,duracion_dias,duracion_oferta_dias')
+      .select('nombre_producto,duracion_dias,duracion_oferta_dias,plantilla_whatsapp')
       .eq('dropshipper_id', window._usuarioActual.id);
     BD.duraciones = {};
     if (data) {
       data.forEach(function(d) {
-        BD.duraciones[d.nombre_producto] = { dias: d.duracion_dias, oferta: d.duracion_oferta_dias };
+        BD.duraciones[d.nombre_producto] = { dias: d.duracion_dias, oferta: d.duracion_oferta_dias, plantilla: d.plantilla_whatsapp || '' };
       });
     }
   }
 
   // ── Guardar duración configurada de un producto ───────────
-  async function guardarDuracionProducto(nombreProducto, duracionDias, duracionOfertaDias) {
+  async function guardarDuracionProducto(nombreProducto, duracionDias, duracionOfertaDias, plantillaWhatsapp) {
     if (!supa || !window._usuarioActual) return false;
     var { error } = await supa.from('producto_duraciones').upsert({
       dropshipper_id: window._usuarioActual.id,
       nombre_producto: nombreProducto,
       duracion_dias: duracionDias,
-      duracion_oferta_dias: duracionOfertaDias
+      duracion_oferta_dias: duracionOfertaDias,
+      plantilla_whatsapp: plantillaWhatsapp || null
     }, { onConflict: 'dropshipper_id,nombre_producto' });
     if (error) { console.error('[Supabase] Error guardando duración:', error); return false; }
-    BD.duraciones[nombreProducto] = { dias: duracionDias, oferta: duracionOfertaDias };
+    BD.duraciones[nombreProducto] = { dias: duracionDias, oferta: duracionOfertaDias, plantilla: plantillaWhatsapp || '' };
     return true;
   }
   window.guardarDuracionProducto = guardarDuracionProducto;
