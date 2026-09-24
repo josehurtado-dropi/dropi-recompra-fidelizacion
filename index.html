@@ -3148,6 +3148,13 @@ document.addEventListener('DOMContentLoaded', function() {
       '<div class="hero-potential-badge">🔥 <b>' + cantidadClientes + '</b> clientes potenciales</div>' +
       '</div>' +
       '</div>' +
+      '<div class="wa-plantilla-card" style="background:#fff;border:1px solid #ECEDF0;border-radius:12px;padding:16px;margin:16px 0;">' +
+        '<div style="font-size:14px;font-weight:800;color:#1B1D23;margin-bottom:10px;">📋 Plantillas de Mensajes de WhatsApp</div>' +
+        '<input type="text" id="waPlantillaBuscar" placeholder="Escribe para buscar una plantilla aprobada..." oninput="filtrarPlantillasWA()" autocomplete="off" ' +
+          'style="width:100%;padding:9px 12px;border:1px solid #ECEDF0;border-radius:8px;font-size:13px;font-family:inherit;margin-bottom:8px;box-sizing:border-box;">' +
+        '<div id="waPlantillaSeleccionada" style="display:none;font-size:12px;color:#1E8E5A;font-weight:700;margin-bottom:10px;padding:8px 10px;background:#E8F5EE;border-radius:8px;"></div>' +
+        '<div id="waPlantillaResultados" style="max-height:240px;overflow-y:auto;"></div>' +
+      '</div>' +
       '<div id="listView">' +
       '<div class="cd-title-row">' +
       '<div class="cd-title">Listado de clientes <span>— ' + producto + '</span></div>' +
@@ -3373,6 +3380,40 @@ document.addEventListener('DOMContentLoaded', function() {
           'setTimeout(function(){ overlay.classList.remove("show"); volverALista(); }, 1400);' +
         '}, 1300);' +
       '}' +
+      'var _plantillasWA = [];' +
+      'var _plantillaSeleccionadaWA = null;' +
+      'function cargarPlantillasWA(){' +
+        'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
+          'method: "POST",' +
+          'headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c", "Content-Type": "application/json" },' +
+          'body: JSON.stringify({action:"list_templates"})' +
+        '}).then(function(r){ return r.json(); }).then(function(data){' +
+          '_plantillasWA = data.templates || [];' +
+        '}).catch(function(err){ console.error("Error cargando plantillas WA:", err); });' +
+      '}' +
+      'function filtrarPlantillasWA(){' +
+        'var q = document.getElementById("waPlantillaBuscar").value.trim().toLowerCase();' +
+        'var cont = document.getElementById("waPlantillaResultados");' +
+        'if(!q){ cont.innerHTML = ""; return; }' +
+        'var resultados = _plantillasWA.filter(function(t){ return t.name.toLowerCase().indexOf(q) >= 0; });' +
+        'if(!resultados.length){ cont.innerHTML = "<div style=\\"padding:10px;font-size:12.5px;color:#9CA3AF;\\">No se encontraron plantillas aprobadas con ese nombre.</div>"; return; }' +
+        'cont.innerHTML = resultados.map(function(t){' +
+          'var idx = _plantillasWA.indexOf(t);' +
+          'var preview = t.bodyPreview ? t.bodyPreview.substring(0,90).replace(/</g,"&lt;") + (t.bodyPreview.length>90?"...":"") : "";' +
+          'return "<div class=\\"wa-plantilla-item\\" onclick=\\"seleccionarPlantillaWA(" + idx + ")\\" style=\\"padding:10px;border:1px solid #ECEDF0;border-radius:8px;margin-bottom:6px;cursor:pointer;\\">" +' +
+            '"<div style=\\"font-weight:700;font-size:13px;color:#1B1D23;\\">" + t.name + "</div>" +' +
+            '"<div style=\\"font-size:11.5px;color:#6B7280;margin-top:3px;\\">" + preview + "</div>" +' +
+          '"</div>";' +
+        '}).join("");' +
+      '}' +
+      'function seleccionarPlantillaWA(idx){' +
+        '_plantillaSeleccionadaWA = _plantillasWA[idx];' +
+        'var el = document.getElementById("waPlantillaSeleccionada");' +
+        'el.style.display = "block";' +
+        'el.textContent = "✅ Plantilla seleccionada: " + _plantillaSeleccionadaWA.name;' +
+        'document.getElementById("waPlantillaBuscar").value = "";' +
+        'document.getElementById("waPlantillaResultados").innerHTML = "";' +
+      '}' +
       'function guardarListaClientes(irAMensaje){' +
         'var seleccionados = contarSeleccionados();' +
         'if(seleccionados === 0){' +
@@ -3446,6 +3487,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'abrirVentanaMensaje();' +
       '}' +
       'updateCdCount();' +
+      'cargarPlantillasWA();' +
       '<' + '/script>' +
       '</body></html>';
 
@@ -3561,10 +3603,7 @@ window.PRODUCTO_IMGS = {
         '<label style="display:block;font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Duración de la oferta/combo (más de 1 unidad) — días</label>' +
         '<input type="number" min="0" id="inputDuracionOferta" placeholder="Ej: 90" ' +
           'style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:8px;font-family:inherit;">' +
-        '<div style="font-size:11px;color:var(--gray);margin-bottom:14px;">Coloca <b>0</b> en ambos campos para quitar la configuración y volver a la segmentación por fecha de compra.</div>' +
-        '<label style="display:block;font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Plantilla de WhatsApp en ChateaPro (opcional por ahora)</label>' +
-        '<input type="text" id="inputPlantillaWhatsapp" placeholder="Ej: recompra_piston_3m_1ano_variante2" ' +
-          'style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;margin-bottom:8px;font-family:inherit;">' +
+        '<div style="font-size:11px;color:var(--gray);margin-bottom:8px;">Coloca <b>0</b> en ambos campos para quitar la configuración y volver a la segmentación por fecha de compra.</div>' +
         '<div id="modalDuracionError" style="display:none;color:var(--red,#E5484D);font-size:12px;margin-bottom:8px;"></div>' +
         '<div style="display:flex;gap:10px;margin-top:12px;">' +
           '<button type="button" onclick="cerrarModalDuracion()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:700;font-size:13px;cursor:pointer;">Cancelar</button>' +
@@ -3581,7 +3620,6 @@ window.PRODUCTO_IMGS = {
     var existente = BD.duraciones && BD.duraciones[nombreProducto];
     document.getElementById('inputDuracionDias').value = existente ? existente.dias : '';
     document.getElementById('inputDuracionOferta').value = existente ? existente.oferta : '';
-    document.getElementById('inputPlantillaWhatsapp').value = existente && existente.plantilla ? existente.plantilla : '';
     var err = document.getElementById('modalDuracionError');
     err.style.display = 'none';
     err.textContent = '';
@@ -3598,7 +3636,6 @@ window.PRODUCTO_IMGS = {
     var err = document.getElementById('modalDuracionError');
     var valDias = document.getElementById('inputDuracionDias').value;
     var valOferta = document.getElementById('inputDuracionOferta').value;
-    var plantilla = document.getElementById('inputPlantillaWhatsapp').value.trim();
     var dias = parseInt(valDias, 10);
     var oferta = parseInt(valOferta, 10);
     err.style.display = 'none';
@@ -3619,7 +3656,7 @@ window.PRODUCTO_IMGS = {
 
     var ok = esReset
       ? await eliminarDuracionProducto(_duracionProductoActivo)
-      : await guardarDuracionProducto(_duracionProductoActivo, dias, oferta, plantilla);
+      : await guardarDuracionProducto(_duracionProductoActivo, dias, oferta);
 
     if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
 
@@ -3913,28 +3950,27 @@ window.PRODUCTO_IMGS = {
     if (!supa || !window._usuarioActual) return;
     var { data } = await supa
       .from('producto_duraciones')
-      .select('nombre_producto,duracion_dias,duracion_oferta_dias,plantilla_whatsapp')
+      .select('nombre_producto,duracion_dias,duracion_oferta_dias')
       .eq('dropshipper_id', window._usuarioActual.id);
     BD.duraciones = {};
     if (data) {
       data.forEach(function(d) {
-        BD.duraciones[d.nombre_producto] = { dias: d.duracion_dias, oferta: d.duracion_oferta_dias, plantilla: d.plantilla_whatsapp || '' };
+        BD.duraciones[d.nombre_producto] = { dias: d.duracion_dias, oferta: d.duracion_oferta_dias };
       });
     }
   }
 
   // ── Guardar duración configurada de un producto ───────────
-  async function guardarDuracionProducto(nombreProducto, duracionDias, duracionOfertaDias, plantillaWhatsapp) {
+  async function guardarDuracionProducto(nombreProducto, duracionDias, duracionOfertaDias) {
     if (!supa || !window._usuarioActual) return false;
     var { error } = await supa.from('producto_duraciones').upsert({
       dropshipper_id: window._usuarioActual.id,
       nombre_producto: nombreProducto,
       duracion_dias: duracionDias,
-      duracion_oferta_dias: duracionOfertaDias,
-      plantilla_whatsapp: plantillaWhatsapp || null
+      duracion_oferta_dias: duracionOfertaDias
     }, { onConflict: 'dropshipper_id,nombre_producto' });
     if (error) { console.error('[Supabase] Error guardando duración:', error); return false; }
-    BD.duraciones[nombreProducto] = { dias: duracionDias, oferta: duracionOfertaDias, plantilla: plantillaWhatsapp || '' };
+    BD.duraciones[nombreProducto] = { dias: duracionDias, oferta: duracionOfertaDias };
     return true;
   }
   window.guardarDuracionProducto = guardarDuracionProducto;
