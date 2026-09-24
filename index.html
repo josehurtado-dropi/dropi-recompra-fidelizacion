@@ -3409,10 +3409,20 @@ document.addEventListener('DOMContentLoaded', function() {
       'function seleccionarPlantillaWA(idx){' +
         '_plantillaSeleccionadaWA = _plantillasWA[idx];' +
         'var el = document.getElementById("waPlantillaSeleccionada");' +
-        'el.style.display = "block";' +
-        'el.textContent = "✅ Plantilla seleccionada: " + _plantillaSeleccionadaWA.name;' +
+        'el.style.display = "flex";' +
+        'el.style.alignItems = "center";' +
+        'el.style.justifyContent = "space-between";' +
+        'el.style.gap = "10px";' +
+        'el.innerHTML = "<span>✅ Plantilla seleccionada: " + _plantillaSeleccionadaWA.name + "</span>" +' +
+          '"<span onclick=\\"quitarPlantillaSeleccionadaWA()\\" title=\\"Quitar selección\\" style=\\"cursor:pointer;font-weight:800;color:#1E8E5A;flex-shrink:0;\\">✕</span>";' +
         'document.getElementById("waPlantillaBuscar").value = "";' +
         'document.getElementById("waPlantillaResultados").innerHTML = "";' +
+      '}' +
+      'function quitarPlantillaSeleccionadaWA(){' +
+        '_plantillaSeleccionadaWA = null;' +
+        'var el = document.getElementById("waPlantillaSeleccionada");' +
+        'el.style.display = "none";' +
+        'el.innerHTML = "";' +
       '}' +
       'function guardarListaClientes(irAMensaje){' +
         'var seleccionados = contarSeleccionados();' +
