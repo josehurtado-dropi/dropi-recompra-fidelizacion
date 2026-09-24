@@ -3548,11 +3548,13 @@ document.addEventListener('DOMContentLoaded', function() {
         '});' +
         'return contactos;' +
       '}' +
+      'var _campanaWAPollTimer = null;' +
       'function cerrarCampanaWAOverlay(){' +
         'var ov = document.getElementById("campanaWAOverlay");' +
         'if(ov){ ov.remove(); }' +
+        'if(_campanaWAPollTimer){ clearInterval(_campanaWAPollTimer); _campanaWAPollTimer = null; }' +
       '}' +
-      'function mostrarOverlayCampanaWA(estado, total, errorMsg, resultados){' +
+      'function mostrarOverlayCampanaWA(estado, datos){' +
         'var ov = document.getElementById("campanaWAOverlay");' +
         'if(!ov){' +
           'ov = document.createElement("div");' +
@@ -3564,28 +3566,43 @@ document.addEventListener('DOMContentLoaded', function() {
         'if(estado === "cargando"){' +
           'html = "<div style=\\"background:#fff;border-radius:14px;padding:28px 32px;max-width:360px;text-align:center;font-family:inherit;\\">" +' +
             '"<div style=\\"font-size:32px;margin-bottom:10px;\\">📲</div>" +' +
-            '"<div style=\\"font-weight:800;font-size:15px;color:#1B1D23;margin-bottom:6px;\\">Enviando campaña por WhatsApp...</div>" +' +
-            '"<div style=\\"font-size:12.5px;color:#6B7280;\\">Enviando a " + total + " cliente(s). Esto puede tardar unos segundos.</div>" +' +
+            '"<div style=\\"font-weight:800;font-size:15px;color:#1B1D23;margin-bottom:6px;\\">Programando campaña...</div>" +' +
+            '"<div style=\\"font-size:12.5px;color:#6B7280;\\">Registrando " + datos.total + " cliente(s) en la cola de envío.</div>" +' +
           '"</div>";' +
         '} else if(estado === "error"){' +
           'html = "<div style=\\"background:#fff;border-radius:14px;padding:28px 32px;max-width:380px;text-align:center;font-family:inherit;\\">" +' +
             '"<div style=\\"font-size:32px;margin-bottom:10px;\\">⚠️</div>" +' +
             '"<div style=\\"font-weight:800;font-size:15px;color:#B42318;margin-bottom:6px;\\">No se pudo ejecutar la campaña</div>" +' +
-            '"<div style=\\"font-size:12.5px;color:#6B7280;margin-bottom:16px;\\">" + (errorMsg || "Error desconocido") + "</div>" +' +
+            '"<div style=\\"font-size:12.5px;color:#6B7280;margin-bottom:16px;\\">" + (datos.errorMsg || "Error desconocido") + "</div>" +' +
             '"<button onclick=\\"cerrarCampanaWAOverlay()\\" style=\\"background:#1B1D23;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;font-size:12.5px;cursor:pointer;\\">Cerrar</button>" +' +
           '"</div>";' +
+        '} else if(estado === "progreso"){' +
+          'var procesados = datos.enviados + datos.errores;' +
+          'var pct = datos.total ? Math.round((procesados / datos.total) * 100) : 0;' +
+          'var minutosRestantes = Math.ceil(datos.pendientes / 30);' +
+          'html = "<div style=\\"background:#fff;border-radius:14px;padding:28px 32px;max-width:400px;width:90%;text-align:center;font-family:inherit;\\">" +' +
+            '"<div style=\\"font-size:32px;margin-bottom:10px;\\">📲</div>" +' +
+            '"<div style=\\"font-weight:800;font-size:15px;color:#1B1D23;margin-bottom:6px;\\">Enviando automáticamente por WhatsApp...</div>" +' +
+            '"<div style=\\"font-size:12px;color:#6B7280;margin-bottom:14px;\\">A razón de 30 mensajes por minuto. Puedes cerrar esta ventana: el envío continúa en segundo plano.</div>" +' +
+            '"<div style=\\"background:#F3F4F6;border-radius:100px;height:10px;overflow:hidden;margin-bottom:10px;\\"><div style=\\"background:#1E8E5A;height:100%;width:" + pct + "%;\\"></div></div>" +' +
+            '"<div style=\\"font-size:12.5px;color:#1B1D23;font-weight:700;margin-bottom:4px;\\">" + procesados + " de " + datos.total + " procesados (" + pct + "%)</div>" +' +
+            '"<div style=\\"font-size:11.5px;color:#6B7280;margin-bottom:16px;\\">✅ " + datos.enviados + " enviados · ❌ " + datos.errores + " con error · ⏳ " + datos.pendientes + " pendientes" + (datos.pendientes ? " · ~" + minutosRestantes + " min restantes" : "") + "</div>" +' +
+            '"<button onclick=\\"cerrarCampanaWAOverlay()\\" style=\\"background:#fff;color:#1B1D23;border:1px solid #ECEDF0;border-radius:8px;padding:9px 18px;font-weight:700;font-size:12.5px;cursor:pointer;\\">Cerrar (el envío continúa)</button>" +' +
+          '"</div>";' +
         '} else {' +
-          'var exitosos = resultados.filter(function(r){ return r.exito; }).length;' +
+          'var resultados = datos.envios || [];' +
+          'var exitosos = resultados.filter(function(r){ return r.estado === "enviado"; }).length;' +
           'var fallidos = resultados.length - exitosos;' +
           'var filas = resultados.map(function(r){' +
+            'var ok = r.estado === "enviado";' +
             'return "<tr>" +' +
               '"<td style=\\"padding:6px 8px;font-size:12px;color:#1B1D23;border-bottom:1px solid #F3F4F6;\\">" + r.nombre + "</td>" +' +
               '"<td style=\\"padding:6px 8px;font-size:12px;color:#1B1D23;border-bottom:1px solid #F3F4F6;\\">" + r.telefono + "</td>" +' +
-              '"<td style=\\"padding:6px 8px;font-size:12px;font-weight:700;border-bottom:1px solid #F3F4F6;color:" + (r.exito ? "#1E8E5A" : "#B42318") + ";\\">" + (r.exito ? "✅ Enviado" : "❌ " + (r.error || "Error")) + "</td>" +' +
+              '"<td style=\\"padding:6px 8px;font-size:12px;font-weight:700;border-bottom:1px solid #F3F4F6;color:" + (ok ? "#1E8E5A" : "#B42318") + ";\\">" + (ok ? "✅ Enviado" : "❌ " + (r.error || "Error")) + "</td>" +' +
             '"</tr>";' +
           '}).join("");' +
           'html = "<div style=\\"background:#fff;border-radius:14px;padding:24px 26px;max-width:520px;width:90%;max-height:80vh;overflow:auto;font-family:inherit;\\">" +' +
-            '"<div style=\\"font-weight:800;font-size:16px;color:#1B1D23;margin-bottom:4px;\\">📊 Resultado de la campaña</div>" +' +
+            '"<div style=\\"font-weight:800;font-size:16px;color:#1B1D23;margin-bottom:4px;\\">📊 Campaña completada</div>" +' +
             '"<div style=\\"font-size:12.5px;color:#6B7280;margin-bottom:14px;\\">" + exitosos + " enviados · " + fallidos + " con error de " + resultados.length + " totales</div>" +' +
             '"<table style=\\"width:100%;border-collapse:collapse;\\"><thead><tr>" +' +
               '"<th style=\\"text-align:left;padding:6px 8px;font-size:11px;color:#9CA3AF;border-bottom:1px solid #ECEDF0;\\">NOMBRE</th>" +' +
@@ -3596,6 +3613,21 @@ document.addEventListener('DOMContentLoaded', function() {
           '"</div>";' +
         '}' +
         'ov.innerHTML = html;' +
+      '}' +
+      'function consultarEstadoCampanaWA(campanaId){' +
+        'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
+          'method: "POST",' +
+          'headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c", "Content-Type": "application/json" },' +
+          'body: JSON.stringify({ action: "campaign_status", campanaId: campanaId })' +
+        '}).then(function(r){ return r.json(); }).then(function(data){' +
+          'if(data.error){ return; }' +
+          'if(data.estado === "completada"){' +
+            'if(_campanaWAPollTimer){ clearInterval(_campanaWAPollTimer); _campanaWAPollTimer = null; }' +
+            'mostrarOverlayCampanaWA("resultado", data);' +
+          '} else {' +
+            'mostrarOverlayCampanaWA("progreso", data);' +
+          '}' +
+        '}).catch(function(err){ console.error("Error consultando estado de campaña:", err); });' +
       '}' +
       'function ejecutarCampanaChateaPro(){' +
         'if(!_plantillaSeleccionadaWA){' +
@@ -3611,16 +3643,17 @@ document.addEventListener('DOMContentLoaded', function() {
           'alert("Esta plantilla tiene imagen. Selecciona la imagen del encabezado en la sección \\"🖼️ Imagen del encabezado\\" antes de continuar.");' +
           'return;' +
         '}' +
-        'if(!confirm("Se enviará la plantilla \\"" + _plantillaSeleccionadaWA.name + "\\" a " + contactos.length + " cliente(s). ¿Deseas continuar?")){ return; }' +
-        'mostrarOverlayCampanaWA("cargando", contactos.length);' +
+        'if(!confirm("Se enviará la plantilla \\"" + _plantillaSeleccionadaWA.name + "\\" a " + contactos.length + " cliente(s), a razón de 30 por minuto. ¿Deseas continuar?")){ return; }' +
+        'mostrarOverlayCampanaWA("cargando", { total: contactos.length });' +
         'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
           'method: "POST",' +
           'headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c", "Content-Type": "application/json" },' +
-          'body: JSON.stringify({ action: "send_campaign", templateName: _plantillaSeleccionadaWA.name, subFlowNs: (_subflowSeleccionadoWA ? _subflowSeleccionadoWA.subFlowNs : null), headerImageUrl: (_mediaSeleccionadaWA ? _mediaSeleccionadaWA.url : null), contactos: contactos })' +
+          'body: JSON.stringify({ action: "schedule_campaign", producto: "' + producto + '", segmento: "' + segmento + '", templateName: _plantillaSeleccionadaWA.name, subFlowNs: (_subflowSeleccionadoWA ? _subflowSeleccionadoWA.subFlowNs : null), headerImageUrl: (_mediaSeleccionadaWA ? _mediaSeleccionadaWA.url : null), contactos: contactos })' +
         '}).then(function(r){ return r.json(); }).then(function(data){' +
-          'if(data.error){ mostrarOverlayCampanaWA("error", 0, data.error); return; }' +
-          'mostrarOverlayCampanaWA("resultado", 0, null, data.resultados || []);' +
-        '}).catch(function(err){ mostrarOverlayCampanaWA("error", 0, err.message || String(err)); });' +
+          'if(data.error){ mostrarOverlayCampanaWA("error", { errorMsg: data.error }); return; }' +
+          'consultarEstadoCampanaWA(data.campanaId);' +
+          '_campanaWAPollTimer = setInterval(function(){ consultarEstadoCampanaWA(data.campanaId); }, 8000);' +
+        '}).catch(function(err){ mostrarOverlayCampanaWA("error", { errorMsg: err.message || String(err) }); });' +
       '}' +
       'function guardarListaClientes(irAMensaje){' +
         'var seleccionados = contarSeleccionados();' +
