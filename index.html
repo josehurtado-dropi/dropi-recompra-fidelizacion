@@ -3865,14 +3865,17 @@ document.addEventListener('DOMContentLoaded', function() {
         '} else if(estado === "progreso"){' +
           'var procesados = datos.enviados + datos.errores;' +
           'var pct = datos.total ? Math.round((procesados / datos.total) * 100) : 0;' +
-          'var minutosRestantes = Math.ceil(datos.pendientes / 30);' +
+          'var LIMITE_DIARIO_WA = 200;' +
+          'var tiempoTexto = datos.pendientes > LIMITE_DIARIO_WA' +
+            '? "~" + Math.ceil(datos.pendientes / LIMITE_DIARIO_WA) + " día(s) (máx. " + LIMITE_DIARIO_WA + "/día por seguridad)"' +
+            ': "~" + Math.ceil(datos.pendientes / 30) + " min";' +
           'html = "<div style=\\"background:#fff;border-radius:14px;padding:28px 32px;max-width:400px;width:90%;text-align:center;font-family:inherit;\\">" +' +
             '"<div style=\\"font-size:32px;margin-bottom:10px;\\">📲</div>" +' +
             '"<div style=\\"font-weight:800;font-size:15px;color:#1B1D23;margin-bottom:6px;\\">Enviando automáticamente por WhatsApp...</div>" +' +
-            '"<div style=\\"font-size:12px;color:#6B7280;margin-bottom:14px;\\">A razón de 30 mensajes por minuto. Puedes cerrar esta ventana: el envío continúa en segundo plano.</div>" +' +
+            '"<div style=\\"font-size:12px;color:#6B7280;margin-bottom:14px;\\">A razón de 30 mensajes/minuto y máximo 200 al día por seguridad. Puedes cerrar esta ventana: el envío sigue en segundo plano, incluso por varios días si tu lista es grande — consulta el avance cuando quieras en Historial de Campañas.</div>" +' +
             '"<div style=\\"background:#F3F4F6;border-radius:100px;height:10px;overflow:hidden;margin-bottom:10px;\\"><div style=\\"background:#1E8E5A;height:100%;width:" + pct + "%;\\"></div></div>" +' +
             '"<div style=\\"font-size:12.5px;color:#1B1D23;font-weight:700;margin-bottom:4px;\\">" + procesados + " de " + datos.total + " procesados (" + pct + "%)</div>" +' +
-            '"<div style=\\"font-size:11.5px;color:#6B7280;margin-bottom:16px;\\">✅ " + datos.enviados + " enviados · ❌ " + datos.errores + " con error · ⏳ " + datos.pendientes + " pendientes" + (datos.pendientes ? " · ~" + minutosRestantes + " min restantes" : "") + "</div>" +' +
+            '"<div style=\\"font-size:11.5px;color:#6B7280;margin-bottom:16px;\\">✅ " + datos.enviados + " enviados · ❌ " + datos.errores + " con error · ⏳ " + datos.pendientes + " pendientes" + (datos.pendientes ? " · " + tiempoTexto + " restantes" : "") + "</div>" +' +
             '"<button onclick=\\"cerrarCampanaWAOverlay()\\" style=\\"background:#fff;color:#1B1D23;border:1px solid #ECEDF0;border-radius:8px;padding:9px 18px;font-weight:700;font-size:12.5px;cursor:pointer;\\">Cerrar (el envío continúa)</button>" +' +
           '"</div>";' +
         '} else {' +
@@ -3929,7 +3932,8 @@ document.addEventListener('DOMContentLoaded', function() {
           'alert("Esta plantilla tiene imagen. Selecciona la imagen del encabezado en la sección \\"🖼️ Imagen del encabezado\\" antes de continuar.");' +
           'return;' +
         '}' +
-        'if(!confirm("Se enviará la plantilla \\"" + _plantillaSeleccionadaWA.name + "\\" a " + contactos.length + " cliente(s), a razón de 30 por minuto. ¿Deseas continuar?")){ return; }' +
+        'var avisoTope = contactos.length > 200 ? (" Por seguridad se envían máximo 200 al día, así que esto tomará aproximadamente " + Math.ceil(contactos.length / 200) + " día(s).") : "";' +
+        'if(!confirm("Se enviará la plantilla \\"" + _plantillaSeleccionadaWA.name + "\\" a " + contactos.length + " cliente(s), a razón de 30 por minuto." + avisoTope + " ¿Deseas continuar?")){ return; }' +
         'mostrarOverlayCampanaWA("cargando", { total: contactos.length });' +
         'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
           'method: "POST",' +
@@ -4013,9 +4017,42 @@ document.addEventListener('DOMContentLoaded', function() {
         '}' +
         'abrirVentanaMensaje();' +
       '}' +
+      'function verificarEnviosPreviosWA(){' +
+        'var filas = document.querySelectorAll("#cdTableBody tr");' +
+        'var telefonos = [];' +
+        'filas.forEach(function(tr){' +
+          'var tds = tr.querySelectorAll("td");' +
+          'if(tds[2]) telefonos.push(tds[2].textContent.trim());' +
+        '});' +
+        'if(!telefonos.length) return;' +
+        'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
+          'method: "POST",' +
+          'headers: { "Authorization": "Bearer " + CHATEA_USER_TOKEN, "Content-Type": "application/json" },' +
+          'body: JSON.stringify({ action: "check_previous_sends", producto: "' + producto + '", telefonos: telefonos })' +
+        '}).then(function(r){ return r.json(); }).then(function(data){' +
+          'if(!data || !data.enviados) return;' +
+          'filas.forEach(function(tr){' +
+            'var tds = tr.querySelectorAll("td");' +
+            'if(!tds[1] || !tds[2]) return;' +
+            'var digitos = tds[2].textContent.replace(/\\D/g, "");' +
+            'if(digitos.length <= 10) digitos = "57" + digitos;' +
+            'var fechaIso = data.enviados[digitos];' +
+            'if(fechaIso && !tds[1].querySelector(".wa-ya-enviado-badge")){' +
+              'var fecha = new Date(fechaIso).toLocaleDateString("es-CO");' +
+              'var badge = document.createElement("span");' +
+              'badge.className = "wa-ya-enviado-badge";' +
+              'badge.title = "Ya recibió un mensaje de esta campaña el " + fecha;' +
+              'badge.style.cssText = "display:inline-block;margin-left:6px;padding:1px 6px;background:#FFF3CD;color:#8A6100;border-radius:100px;font-size:10px;font-weight:700;vertical-align:middle;";' +
+              'badge.textContent = "📨 " + fecha;' +
+              'tds[1].appendChild(badge);' +
+            '}' +
+          '});' +
+        '}).catch(function(err){ console.error("Error verificando envíos previos:", err); });' +
+      '}' +
       'updateCdCount();' +
       'cargarPlantillasWA();' +
       'cargarSubflowsWA();' +
+      'verificarEnviosPreviosWA();' +
       '<' + '/script>' +
       '</body></html>';
 
