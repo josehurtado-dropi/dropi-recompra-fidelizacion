@@ -2455,9 +2455,13 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   async function obtenerTokenSesionActual(){
+    if(window._sessionAccessToken) return window._sessionAccessToken;
     try {
-      var res = await supa.auth.getSession();
-      return res && res.data && res.data.session ? res.data.session.access_token : null;
+      var clienteAuth = window._supaLogin || supa;
+      var res = await clienteAuth.auth.getSession();
+      var token = res && res.data && res.data.session ? res.data.session.access_token : null;
+      if(token) window._sessionAccessToken = token;
+      return token;
     } catch(e) {
       return null;
     }
