@@ -2454,11 +2454,25 @@ document.addEventListener('DOMContentLoaded', function() {
       '</tr></thead><tbody>' + filas + '</tbody></table></div>';
   }
 
-  function cargarHistorialCampanasView(){
+  async function obtenerTokenSesionActual(){
+    try {
+      var res = await supa.auth.getSession();
+      return res && res.data && res.data.session ? res.data.session.access_token : null;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  async function cargarHistorialCampanasView(){
     renderHistorialCampanasView(null);
+    var token = await obtenerTokenSesionActual();
+    if(!token){
+      document.getElementById('historialCampanasViewBody').innerHTML = '<div style="padding:24px;text-align:center;color:#B42318;font-size:13px;">Tu sesión expiró. Vuelve a iniciar sesión e intenta de nuevo.</div>';
+      return;
+    }
     fetch('https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro', {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c', 'Content-Type': 'application/json' },
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'list_campaigns' })
     }).then(function(r){ return r.json(); }).then(function(data){
       renderHistorialCampanasView(data.campanas || []);
@@ -3341,6 +3355,7 @@ document.addEventListener('DOMContentLoaded', function() {
       '</div></div>' +
       '<' + 'script>' + xlsxLibSrc + '<' + '/script>' +
       '<script>' +
+      'var CHATEA_USER_TOKEN = "' + (window._sessionAccessToken || '') + '";' +
       'var accionSeleccionada = null;' +
       'function padN(n){ return n < 10 ? "0" + n : "" + n; }' +
       'function toggleDropiSidebar(){' +
@@ -3497,7 +3512,7 @@ document.addEventListener('DOMContentLoaded', function() {
       'function cargarPlantillasWA(){' +
         'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
           'method: "POST",' +
-          'headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c", "Content-Type": "application/json" },' +
+          'headers: { "Authorization": "Bearer " + CHATEA_USER_TOKEN, "Content-Type": "application/json" },' +
           'body: JSON.stringify({action:"list_templates"})' +
         '}).then(function(r){ return r.json(); }).then(function(data){' +
           '_plantillasWA = data.templates || [];' +
@@ -3551,7 +3566,7 @@ document.addEventListener('DOMContentLoaded', function() {
       'function cargarSubflowsWA(){' +
         'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
           'method: "POST",' +
-          'headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c", "Content-Type": "application/json" },' +
+          'headers: { "Authorization": "Bearer " + CHATEA_USER_TOKEN, "Content-Type": "application/json" },' +
           'body: JSON.stringify({action:"list_subflows"})' +
         '}).then(function(r){ return r.json(); }).then(function(data){' +
           '_subflowsWA = data.subflows || [];' +
@@ -3593,7 +3608,7 @@ document.addEventListener('DOMContentLoaded', function() {
       'function cargarMediaWA(){' +
         'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
           'method: "POST",' +
-          'headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c", "Content-Type": "application/json" },' +
+          'headers: { "Authorization": "Bearer " + CHATEA_USER_TOKEN, "Content-Type": "application/json" },' +
           'body: JSON.stringify({action:"list_media"})' +
         '}).then(function(r){ return r.json(); }).then(function(data){' +
           '_mediaWA = data.media || [];' +
@@ -3714,7 +3729,7 @@ document.addEventListener('DOMContentLoaded', function() {
       'function consultarEstadoCampanaWA(campanaId){' +
         'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
           'method: "POST",' +
-          'headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c", "Content-Type": "application/json" },' +
+          'headers: { "Authorization": "Bearer " + CHATEA_USER_TOKEN, "Content-Type": "application/json" },' +
           'body: JSON.stringify({ action: "campaign_status", campanaId: campanaId })' +
         '}).then(function(r){ return r.json(); }).then(function(data){' +
           'if(data.error){ return; }' +
@@ -3744,7 +3759,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'mostrarOverlayCampanaWA("cargando", { total: contactos.length });' +
         'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
           'method: "POST",' +
-          'headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c", "Content-Type": "application/json" },' +
+          'headers: { "Authorization": "Bearer " + CHATEA_USER_TOKEN, "Content-Type": "application/json" },' +
           'body: JSON.stringify({ action: "schedule_campaign", producto: "' + producto + '", segmento: "' + segmento + '", templateName: _plantillaSeleccionadaWA.name, subFlowNs: (_subflowSeleccionadoWA ? _subflowSeleccionadoWA.subFlowNs : null), headerImageUrl: (_mediaSeleccionadaWA ? _mediaSeleccionadaWA.url : null), contactos: contactos })' +
         '}).then(function(r){ return r.json(); }).then(function(data){' +
           'if(data.error){ mostrarOverlayCampanaWA("error", { errorMsg: data.error }); return; }' +
@@ -4577,8 +4592,14 @@ window.PRODUCTO_IMGS = {
     try {
       supa = window._supaLogin || window.supabase.createClient(SUPA_URL, SUPA_KEY);
       window._supaLogin = supa;
+      // Mantener el token de sesión real siempre actualizado (login, logout, refresco automático),
+      // para que las llamadas al Edge Function de ChateaPro se identifiquen como este usuario.
+      supa.auth.onAuthStateChange(function(event, session){
+        window._sessionAccessToken = session ? session.access_token : null;
+      });
       // Verificar si ya hay sesión activa (usuario ya logueado)
       var { data: { session } } = await supa.auth.getSession();
+      window._sessionAccessToken = session ? session.access_token : null;
       if (session && session.user) {
         console.log('[Supabase] Sesión activa encontrada:', session.user.email);
         setBadge('ok');
