@@ -3506,6 +3506,7 @@ document.addEventListener('DOMContentLoaded', function() {
       '<' + 'script>' + xlsxLibSrc + '<' + '/script>' +
       '<script>' +
       'var CHATEA_USER_TOKEN = "' + (window._sessionAccessToken || '') + '";' +
+      'var PRODUCTO_ACTUAL_WA = ' + JSON.stringify(producto) + ';' +
       'var accionSeleccionada = null;' +
       'function padN(n){ return n < 10 ? "0" + n : "" + n; }' +
       'function toggleDropiSidebar(){' +
@@ -3938,7 +3939,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
           'method: "POST",' +
           'headers: { "Authorization": "Bearer " + CHATEA_USER_TOKEN, "Content-Type": "application/json" },' +
-          'body: JSON.stringify({ action: "schedule_campaign", producto: "' + producto + '", segmento: "' + segmento + '", templateName: _plantillaSeleccionadaWA.name, subFlowNs: (_subflowSeleccionadoWA ? _subflowSeleccionadoWA.subFlowNs : null), headerImageUrl: (_mediaSeleccionadaWA ? _mediaSeleccionadaWA.url : null), contactos: contactos })' +
+          'body: JSON.stringify({ action: "schedule_campaign", producto: PRODUCTO_ACTUAL_WA, segmento: ' + JSON.stringify(segmento) + ', templateName: _plantillaSeleccionadaWA.name, subFlowNs: (_subflowSeleccionadoWA ? _subflowSeleccionadoWA.subFlowNs : null), headerImageUrl: (_mediaSeleccionadaWA ? _mediaSeleccionadaWA.url : null), contactos: contactos })' +
         '}).then(function(r){ return r.json(); }).then(function(data){' +
           'if(data.error){ mostrarOverlayCampanaWA("error", { errorMsg: data.error }); return; }' +
           'consultarEstadoCampanaWA(data.campanaId);' +
@@ -4028,7 +4029,7 @@ document.addEventListener('DOMContentLoaded', function() {
         'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
           'method: "POST",' +
           'headers: { "Authorization": "Bearer " + CHATEA_USER_TOKEN, "Content-Type": "application/json" },' +
-          'body: JSON.stringify({ action: "check_previous_sends", producto: "' + producto + '", telefonos: telefonos })' +
+          'body: JSON.stringify({ action: "check_previous_sends", producto: PRODUCTO_ACTUAL_WA, telefonos: telefonos })' +
         '}).then(function(r){ return r.json(); }).then(function(data){' +
           'if(!data || !data.enviados) return;' +
           'filas.forEach(function(tr){' +
