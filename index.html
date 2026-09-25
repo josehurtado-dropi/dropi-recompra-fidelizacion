@@ -3182,6 +3182,9 @@ document.addEventListener('DOMContentLoaded', function() {
       '<span class="chatea-label">Ejecutar campaña con</span>' +
       '<img class="chatea-logo-inline" src="' + chateaLogoSrc + '" alt="Chatea PRO">' +
       '</button>' +
+      '<button class="cta-save-list" onclick="verHistorialCampanasWA()">' +
+      '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.1-2.8-2.8L7 14"/></svg>' +
+      'Historial de Campañas</button>' +
       '</div>' +
       '<div class="cd-selected-count"><b id="cdCount">0</b> de <b id="cdTotal">0</b> clientes seleccionados</div>' +
       '</div>' +
@@ -3654,6 +3657,77 @@ document.addEventListener('DOMContentLoaded', function() {
           'consultarEstadoCampanaWA(data.campanaId);' +
           '_campanaWAPollTimer = setInterval(function(){ consultarEstadoCampanaWA(data.campanaId); }, 8000);' +
         '}).catch(function(err){ mostrarOverlayCampanaWA("error", { errorMsg: err.message || String(err) }); });' +
+      '}' +
+      'function cerrarHistorialCampanasOverlay(){' +
+        'var ov = document.getElementById("historialCampanasOverlay");' +
+        'if(ov){ ov.remove(); }' +
+      '}' +
+      'function formatearFechaCampanaWA(iso){' +
+        'if(!iso) return "";' +
+        'var d = new Date(iso);' +
+        'return d.toLocaleDateString("es-CO") + " " + d.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });' +
+      '}' +
+      'function renderHistorialCampanasWA(campanas){' +
+        'var ov = document.getElementById("historialCampanasOverlay");' +
+        'if(!ov){' +
+          'ov = document.createElement("div");' +
+          'ov.id = "historialCampanasOverlay";' +
+          'ov.style.cssText = "position:fixed;inset:0;background:rgba(15,17,21,.55);display:flex;align-items:center;justify-content:center;z-index:99999;";' +
+          'document.body.appendChild(ov);' +
+        '}' +
+        'var html = "";' +
+        'if(campanas === null){' +
+          'html = "<div style=\\"background:#fff;border-radius:14px;padding:28px 32px;max-width:360px;text-align:center;font-family:inherit;\\">" +' +
+            '"<div style=\\"font-size:32px;margin-bottom:10px;\\">📊</div>" +' +
+            '"<div style=\\"font-weight:800;font-size:15px;color:#1B1D23;\\">Cargando historial...</div>" +' +
+          '"</div>";' +
+        '} else if(!campanas.length){' +
+          'html = "<div style=\\"background:#fff;border-radius:14px;padding:28px 32px;max-width:380px;text-align:center;font-family:inherit;\\">" +' +
+            '"<div style=\\"font-size:32px;margin-bottom:10px;\\">📊</div>" +' +
+            '"<div style=\\"font-weight:800;font-size:15px;color:#1B1D23;margin-bottom:16px;\\">Todavía no has ejecutado ninguna campaña.</div>" +' +
+            '"<button onclick=\\"cerrarHistorialCampanasOverlay()\\" style=\\"background:#1B1D23;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;font-size:12.5px;cursor:pointer;\\">Cerrar</button>" +' +
+          '"</div>";' +
+        '} else {' +
+          'var filas = campanas.map(function(c){' +
+            'var etiquetaEstado = c.estado === "completada" ? "✅ Completada" : "⏳ En progreso";' +
+            'return "<tr>" +' +
+              '"<td style=\\"padding:7px 8px;font-size:12px;color:#1B1D23;border-bottom:1px solid #F3F4F6;\\">" + (c.producto || "-") + (c.segmento ? " · " + c.segmento : "") + "</td>" +' +
+              '"<td style=\\"padding:7px 8px;font-size:12px;color:#1B1D23;border-bottom:1px solid #F3F4F6;\\">" + c.template_name + "</td>" +' +
+              '"<td style=\\"padding:7px 8px;font-size:12px;color:#1B1D23;border-bottom:1px solid #F3F4F6;text-align:center;\\">" + c.total_contactos + "</td>" +' +
+              '"<td style=\\"padding:7px 8px;font-size:12px;color:#1E8E5A;font-weight:700;border-bottom:1px solid #F3F4F6;text-align:center;\\">" + c.enviados + "</td>" +' +
+              '"<td style=\\"padding:7px 8px;font-size:12px;color:#B42318;font-weight:700;border-bottom:1px solid #F3F4F6;text-align:center;\\">" + c.errores + "</td>" +' +
+              '"<td style=\\"padding:7px 8px;font-size:12px;color:#1B1D23;border-bottom:1px solid #F3F4F6;white-space:nowrap;\\">" + etiquetaEstado + "</td>" +' +
+              '"<td style=\\"padding:7px 8px;font-size:11.5px;color:#6B7280;border-bottom:1px solid #F3F4F6;white-space:nowrap;\\">" + formatearFechaCampanaWA(c.created_at) + "</td>" +' +
+            '"</tr>";' +
+          '}).join("");' +
+          'html = "<div style=\\"background:#fff;border-radius:14px;padding:24px 26px;max-width:760px;width:95%;max-height:80vh;overflow:auto;font-family:inherit;\\">" +' +
+            '"<div style=\\"display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;\\">" +' +
+              '"<div style=\\"font-weight:800;font-size:16px;color:#1B1D23;\\">📊 Historial de Campañas</div>" +' +
+              '"<button onclick=\\"verHistorialCampanasWA()\\" style=\\"background:#fff;color:#1B1D23;border:1px solid #ECEDF0;border-radius:8px;padding:6px 12px;font-weight:700;font-size:11.5px;cursor:pointer;\\">↻ Actualizar</button>" +' +
+            '"</div>" +' +
+            '"<div style=\\"overflow-x:auto;\\"><table style=\\"width:100%;border-collapse:collapse;\\"><thead><tr>" +' +
+              '"<th style=\\"text-align:left;padding:7px 8px;font-size:11px;color:#9CA3AF;border-bottom:1px solid #ECEDF0;\\">PRODUCTO / SEGMENTO</th>" +' +
+              '"<th style=\\"text-align:left;padding:7px 8px;font-size:11px;color:#9CA3AF;border-bottom:1px solid #ECEDF0;\\">PLANTILLA</th>" +' +
+              '"<th style=\\"text-align:center;padding:7px 8px;font-size:11px;color:#9CA3AF;border-bottom:1px solid #ECEDF0;\\">RECEPTORES</th>" +' +
+              '"<th style=\\"text-align:center;padding:7px 8px;font-size:11px;color:#9CA3AF;border-bottom:1px solid #ECEDF0;\\">ENVIADO</th>" +' +
+              '"<th style=\\"text-align:center;padding:7px 8px;font-size:11px;color:#9CA3AF;border-bottom:1px solid #ECEDF0;\\">FALLIDO</th>" +' +
+              '"<th style=\\"text-align:left;padding:7px 8px;font-size:11px;color:#9CA3AF;border-bottom:1px solid #ECEDF0;\\">ESTADO</th>" +' +
+              '"<th style=\\"text-align:left;padding:7px 8px;font-size:11px;color:#9CA3AF;border-bottom:1px solid #ECEDF0;\\">CREADO</th>" +' +
+            '"</tr></thead><tbody>" + filas + "</tbody></table></div>" +' +
+            '"<div style=\\"text-align:right;margin-top:16px;\\"><button onclick=\\"cerrarHistorialCampanasOverlay()\\" style=\\"background:#1B1D23;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;font-size:12.5px;cursor:pointer;\\">Cerrar</button></div>" +' +
+          '"</div>";' +
+        '}' +
+        'ov.innerHTML = html;' +
+      '}' +
+      'function verHistorialCampanasWA(){' +
+        'renderHistorialCampanasWA(null);' +
+        'fetch("https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro", {' +
+          'method: "POST",' +
+          'headers: { "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZnBudmxucWpmampnamNqaXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNzAxNTgsImV4cCI6MjEwMzk0NjE1OH0.aYQump4x_XeO-DmeD8qxWRzlsYn9n2JPCkammY6_E4c", "Content-Type": "application/json" },' +
+          'body: JSON.stringify({ action: "list_campaigns" })' +
+        '}).then(function(r){ return r.json(); }).then(function(data){' +
+          'renderHistorialCampanasWA(data.campanas || []);' +
+        '}).catch(function(err){ console.error("Error cargando historial de campañas:", err); });' +
       '}' +
       'function guardarListaClientes(irAMensaje){' +
         'var seleccionados = contarSeleccionados();' +
