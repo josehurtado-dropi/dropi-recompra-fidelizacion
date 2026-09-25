@@ -2263,6 +2263,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="nav-sub" id="navRecompraSubmenu">
         <div class="nav-sub-item active" id="navSubSegmentacion" onclick="showView('view-recompra', document.getElementById('navRecompraParent')); marcarSubmenuActivo(this);">Segmentación de Clientes</div>
         <div class="nav-sub-item" id="navSubHistorial" onclick="mostrarHistorialCampanasView(this)">Historial de Campañas</div>
+        <div class="nav-sub-item" id="navSubIntegraciones" onclick="mostrarIntegracionesView(this)">Integraciones</div>
       </div>
       <!-- ============ FIN NUEVO MÓDULO ============ -->
     </nav>
@@ -2381,6 +2382,20 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       </div>
 
+      <!-- ============ VIEW: INTEGRACIONES ============ -->
+      <div class="view" id="view-integraciones">
+        <div class="report-header">
+          <div class="report-title">Integraciones</div>
+        </div>
+        <div class="card" style="padding:24px;max-width:560px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <div style="font-size:16px;font-weight:800;color:var(--ink);">💬 ChateaPro (WhatsApp)</div>
+          </div>
+          <div style="font-size:13px;color:var(--gray);line-height:1.5;margin-bottom:18px;">Conecta tu propia cuenta de ChateaPro para poder enviar campañas de recompra por WhatsApp desde este módulo. Tu clave se guarda de forma segura y nunca se muestra de nuevo.</div>
+          <div id="integracionesEstadoBox"></div>
+        </div>
+      </div>
+
       <!-- ============ VIEW: DATOS DEL CLIENTE ============ -->
     </div>
   </div>
@@ -2413,6 +2428,137 @@ document.addEventListener('DOMContentLoaded', function() {
     showView('view-historial-campanas', document.getElementById('navRecompraParent'));
     marcarSubmenuActivo(navEl);
     cargarHistorialCampanasView();
+  }
+
+  function mostrarIntegracionesView(navEl){
+    showView('view-integraciones', document.getElementById('navRecompraParent'));
+    marcarSubmenuActivo(navEl);
+    cargarEstadoIntegracionChateaPro();
+  }
+
+  function renderFormularioConexionChateaPro(){
+    var box = document.getElementById('integracionesEstadoBox');
+    box.innerHTML =
+      '<div style="font-size:12.5px;color:var(--gray);line-height:1.5;margin-bottom:12px;">Encuentra tu clave en ChateaPro: tu avatar (arriba a la derecha) → "Your Settings" → "Claves API" → "Crear token API".</div>' +
+      '<input type="password" id="chateaproApiKeyInput" placeholder="Pega aquí tu clave API de ChateaPro..." autocomplete="off" style="width:100%;padding:10px 12px;border:1px solid #ECEDF0;border-radius:8px;font-size:13px;font-family:inherit;box-sizing:border-box;margin-bottom:10px;">' +
+      '<div id="chateaproTestResultBox" style="margin-bottom:12px;min-height:16px;"></div>' +
+      '<div style="display:flex;gap:10px;">' +
+        '<button onclick="probarConexionChateaPro()" style="background:#fff;color:#1B1D23;border:1px solid #ECEDF0;border-radius:8px;padding:9px 16px;font-weight:700;font-size:12.5px;cursor:pointer;">Probar conexión</button>' +
+        '<button onclick="guardarConexionChateaPro()" id="btnGuardarConexionChateaPro" disabled style="background:#D1D5DB;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:700;font-size:12.5px;cursor:not-allowed;">Guardar</button>' +
+      '</div>';
+  }
+
+  function renderIntegracionChateaProBox(estado){
+    var box = document.getElementById('integracionesEstadoBox');
+    if(estado === 'cargando'){
+      box.innerHTML = '<div style="padding:16px 0;color:var(--gray);font-size:13px;">Consultando estado de la conexión...</div>';
+      return;
+    }
+    if(estado.connected){
+      var fecha = formatearFechaCampana(estado.conectadoAt);
+      box.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#E8F5EE;border:1px solid #BEEAD1;border-radius:10px;flex-wrap:wrap;gap:10px;">' +
+          '<div>' +
+            '<div style="font-weight:800;color:#1E8E5A;font-size:13.5px;">✅ ChateaPro conectado</div>' +
+            '<div style="font-size:12px;color:#6B7280;margin-top:2px;">Desde ' + fecha + '</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;">' +
+            '<button onclick="renderFormularioConexionChateaPro()" style="background:#fff;color:#1B1D23;border:1px solid #ECEDF0;border-radius:8px;padding:8px 14px;font-weight:700;font-size:12.5px;cursor:pointer;">Cambiar clave</button>' +
+            '<button onclick="desconectarChateaPro()" style="background:#fff;color:#B42318;border:1px solid #F5C2C0;border-radius:8px;padding:8px 14px;font-weight:700;font-size:12.5px;cursor:pointer;">Desconectar</button>' +
+          '</div>' +
+        '</div>';
+    } else {
+      renderFormularioConexionChateaPro();
+    }
+  }
+
+  function cargarEstadoIntegracionChateaPro(){
+    renderIntegracionChateaProBox('cargando');
+    obtenerTokenSesionActual().then(function(token){
+      if(!token){
+        document.getElementById('integracionesEstadoBox').innerHTML = '<div style="padding:16px 0;color:#B42318;font-size:13px;">Tu sesión expiró. Vuelve a iniciar sesión e intenta de nuevo.</div>';
+        return;
+      }
+      fetch('https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get_integration_status' })
+      }).then(function(r){ return r.json(); }).then(function(data){
+        renderIntegracionChateaProBox(data);
+      }).catch(function(err){
+        console.error('Error consultando integración ChateaPro:', err);
+        renderFormularioConexionChateaPro();
+      });
+    });
+  }
+
+  function probarConexionChateaPro(){
+    var input = document.getElementById('chateaproApiKeyInput');
+    var apiKey = input.value.trim();
+    var resultBox = document.getElementById('chateaproTestResultBox');
+    var btnGuardar = document.getElementById('btnGuardarConexionChateaPro');
+    if(!apiKey){
+      resultBox.innerHTML = '<div style="font-size:12px;color:#B42318;">Pega tu clave API antes de probar.</div>';
+      return;
+    }
+    resultBox.innerHTML = '<div style="font-size:12px;color:#6B7280;">Probando conexión...</div>';
+    btnGuardar.disabled = true;
+    btnGuardar.style.background = '#D1D5DB';
+    btnGuardar.style.cursor = 'not-allowed';
+    obtenerTokenSesionActual().then(function(token){
+      fetch('https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'test_chateapro_key', apiKey: apiKey })
+      }).then(function(r){ return r.json(); }).then(function(data){
+        if(data.error){
+          resultBox.innerHTML = '<div style="font-size:12px;color:#B42318;">❌ No se pudo conectar: ' + data.error + '</div>';
+          return;
+        }
+        resultBox.innerHTML = '<div style="font-size:12px;color:#1E8E5A;font-weight:700;">✅ Conexión exitosa (' + data.templatesCount + ' plantillas aprobadas encontradas). Ya puedes guardar.</div>';
+        btnGuardar.disabled = false;
+        btnGuardar.style.background = '#1B1D23';
+        btnGuardar.style.cursor = 'pointer';
+      }).catch(function(err){
+        resultBox.innerHTML = '<div style="font-size:12px;color:#B42318;">❌ Error probando la conexión: ' + (err.message || err) + '</div>';
+      });
+    });
+  }
+
+  function guardarConexionChateaPro(){
+    var input = document.getElementById('chateaproApiKeyInput');
+    var apiKey = input.value.trim();
+    var resultBox = document.getElementById('chateaproTestResultBox');
+    if(!apiKey) return;
+    resultBox.innerHTML = '<div style="font-size:12px;color:#6B7280;">Guardando...</div>';
+    obtenerTokenSesionActual().then(function(token){
+      fetch('https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_integration', apiKey: apiKey })
+      }).then(function(r){ return r.json(); }).then(function(data){
+        if(data.error){
+          resultBox.innerHTML = '<div style="font-size:12px;color:#B42318;">❌ No se pudo guardar: ' + data.error + '</div>';
+          return;
+        }
+        cargarEstadoIntegracionChateaPro();
+      }).catch(function(err){
+        resultBox.innerHTML = '<div style="font-size:12px;color:#B42318;">❌ Error guardando: ' + (err.message || err) + '</div>';
+      });
+    });
+  }
+
+  function desconectarChateaPro(){
+    if(!confirm('¿Seguro que quieres desconectar tu cuenta de ChateaPro? No podrás enviar campañas hasta que vuelvas a conectarla.')) return;
+    obtenerTokenSesionActual().then(function(token){
+      fetch('https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'disconnect_integration' })
+      }).then(function(r){ return r.json(); }).then(function(){
+        cargarEstadoIntegracionChateaPro();
+      });
+    });
   }
 
   function formatearFechaCampana(iso){
