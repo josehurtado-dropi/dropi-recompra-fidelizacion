@@ -4436,6 +4436,337 @@ window.PRODUCTO_IMGS = {
     }
   }
 
+  // ── Fase 2: acciones sobre una campaña en curso ────────────
+  document.addEventListener('click', function(ev) {
+    document.querySelectorAll('.cc-dropdown-menu').forEach(function(menu) {
+      if (menu.style.display === 'none') return;
+      var toggleBtn = menu.previousElementSibling;
+      if (menu.contains(ev.target) || (toggleBtn && toggleBtn.contains(ev.target))) return;
+      menu.style.display = 'none';
+    });
+  });
+
+  window.toggleMenuCampanaEnCurso = function(campanaId) {
+    var menu = document.getElementById('ccMenu-' + campanaId);
+    if (!menu) return;
+    var abierto = menu.style.display !== 'none';
+    document.querySelectorAll('.cc-dropdown-menu').forEach(function(m) { m.style.display = 'none'; });
+    menu.style.display = abierto ? 'none' : 'block';
+  };
+
+  window.continuarCampanaEnCurso = function(campanaId) {
+    var menu = document.getElementById('ccMenu-' + campanaId);
+    if (menu) menu.style.display = 'none';
+  };
+
+  var _ccCampanaActivaId = null;
+  var _ccPlantillas = [];
+  var _ccPlantillaSeleccionada = null;
+  var _ccSubflows = [];
+  var _ccSubflowSeleccionado = null;
+  var _ccMedia = [];
+  var _ccMediaSeleccionada = null;
+
+  function crearModalCambiarCampana() {
+    if (document.getElementById('modalCambiarCampanaOverlay')) return;
+    var overlay = document.createElement('div');
+    overlay.id = 'modalCambiarCampanaOverlay';
+    overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(20,22,30,.45);z-index:9999;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML =
+      '<div style="background:#fff;border-radius:14px;padding:24px;width:460px;max-width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,.25);">' +
+        '<div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:2px;">✏️ Cambiar plantilla, imagen o flujo</div>' +
+        '<div id="ccModalProducto" style="font-size:12.5px;color:var(--gray);margin-bottom:6px;"></div>' +
+        '<div style="font-size:11.5px;color:var(--gray);margin-bottom:16px;">Este cambio aplica solo a los clientes <b>pendientes</b> de esta campaña — a quien ya se le envió el mensaje no le llega de nuevo.</div>' +
+
+        '<div class="wa-plantilla-card" style="background:#FAFAFA;border:1px solid #ECEDF0;border-radius:12px;padding:14px;margin-bottom:12px;">' +
+          '<div style="font-size:13px;font-weight:800;color:#1B1D23;margin-bottom:8px;">📋 Plantilla de WhatsApp aprobada</div>' +
+          '<input type="text" id="ccPlantillaBuscar" placeholder="Escribe para buscar una plantilla aprobada..." oninput="ccFiltrarPlantillas()" autocomplete="off" ' +
+            'style="width:100%;padding:9px 12px;border:1px solid #ECEDF0;border-radius:8px;font-size:13px;font-family:inherit;margin-bottom:8px;box-sizing:border-box;">' +
+          '<div id="ccPlantillaSeleccionada" style="display:none;font-size:12px;color:#1E8E5A;font-weight:700;margin-bottom:8px;padding:8px 10px;background:#E8F5EE;border-radius:8px;"></div>' +
+          '<div id="ccPlantillaResultados" style="max-height:180px;overflow-y:auto;"></div>' +
+        '</div>' +
+
+        '<div class="wa-plantilla-card" style="background:#FAFAFA;border:1px solid #ECEDF0;border-radius:12px;padding:14px;margin-bottom:12px;">' +
+          '<div style="font-size:13px;font-weight:800;color:#1B1D23;margin-bottom:8px;">🔀 Flujo de Remarketing (opcional)</div>' +
+          '<input type="text" id="ccSubflowBuscar" placeholder="Escribe para buscar un subflujo o nodo..." oninput="ccFiltrarSubflows()" autocomplete="off" ' +
+            'style="width:100%;padding:9px 12px;border:1px solid #ECEDF0;border-radius:8px;font-size:13px;font-family:inherit;margin-bottom:8px;box-sizing:border-box;">' +
+          '<div id="ccSubflowSeleccionado" style="display:none;font-size:12px;color:#1E8E5A;font-weight:700;margin-bottom:8px;padding:8px 10px;background:#E8F5EE;border-radius:8px;"></div>' +
+          '<div id="ccSubflowResultados" style="max-height:160px;overflow-y:auto;"></div>' +
+        '</div>' +
+
+        '<div class="wa-plantilla-card" id="ccMediaCard" style="display:none;background:#FAFAFA;border:1px solid #ECEDF0;border-radius:12px;padding:14px;margin-bottom:8px;">' +
+          '<div style="font-size:13px;font-weight:800;color:#1B1D23;margin-bottom:8px;">🖼️ Imagen del encabezado</div>' +
+          '<input type="text" id="ccMediaBuscar" placeholder="Buscar imagen por nombre de archivo..." oninput="ccFiltrarMedia()" autocomplete="off" ' +
+            'style="width:100%;padding:9px 12px;border:1px solid #ECEDF0;border-radius:8px;font-size:13px;font-family:inherit;margin-bottom:8px;box-sizing:border-box;">' +
+          '<div id="ccMediaSeleccionada" style="display:none;font-size:12px;color:#1E8E5A;font-weight:700;margin-bottom:8px;padding:8px 10px;background:#E8F5EE;border-radius:8px;align-items:center;gap:10px;"></div>' +
+          '<div id="ccMediaResultados" style="max-height:200px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:8px;"></div>' +
+        '</div>' +
+
+        '<div id="ccModalError" style="display:none;color:#B42318;font-size:12px;margin-bottom:8px;"></div>' +
+        '<div style="display:flex;gap:10px;margin-top:8px;">' +
+          '<button type="button" onclick="cerrarModalCambiarCampana()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:700;font-size:13px;cursor:pointer;">Cancelar</button>' +
+          '<button type="button" onclick="confirmarCambiarCampana()" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--orange);color:#fff;font-weight:700;font-size:13px;cursor:pointer;">Guardar cambios</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+  }
+
+  window.abrirModalCambiarCampana = function(campanaId, nombreProducto) {
+    document.querySelectorAll('.cc-dropdown-menu').forEach(function(m) { m.style.display = 'none'; });
+    crearModalCambiarCampana();
+    _ccCampanaActivaId = campanaId;
+    _ccPlantillas = []; _ccPlantillaSeleccionada = null;
+    _ccSubflows = []; _ccSubflowSeleccionado = null;
+    _ccMedia = []; _ccMediaSeleccionada = null;
+    document.getElementById('ccModalProducto').textContent = nombreProducto;
+    document.getElementById('ccPlantillaBuscar').value = '';
+    document.getElementById('ccPlantillaResultados').innerHTML = '';
+    document.getElementById('ccPlantillaSeleccionada').style.display = 'none';
+    document.getElementById('ccSubflowBuscar').value = '';
+    document.getElementById('ccSubflowResultados').innerHTML = '';
+    document.getElementById('ccSubflowSeleccionado').style.display = 'none';
+    document.getElementById('ccMediaCard').style.display = 'none';
+    document.getElementById('ccMediaBuscar').value = '';
+    document.getElementById('ccMediaResultados').innerHTML = '';
+    document.getElementById('ccMediaSeleccionada').style.display = 'none';
+    var err = document.getElementById('ccModalError');
+    err.style.display = 'none'; err.textContent = '';
+    document.getElementById('modalCambiarCampanaOverlay').style.display = 'flex';
+    ccCargarPlantillas();
+    ccCargarSubflows();
+  };
+
+  window.cerrarModalCambiarCampana = function() {
+    var overlay = document.getElementById('modalCambiarCampanaOverlay');
+    if (overlay) overlay.style.display = 'none';
+    _ccCampanaActivaId = null;
+  };
+
+  async function ccCargarPlantillas() {
+    var token = await obtenerTokenSesionActual();
+    if (!token) return;
+    try {
+      var r = await fetch('https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'list_templates' })
+      });
+      var data = await r.json();
+      if (data.error) {
+        document.getElementById('ccPlantillaResultados').innerHTML = '<div style="padding:10px;font-size:12.5px;color:#B42318;">⚠️ No se pudieron cargar las plantillas: ' + data.error + '</div>';
+        return;
+      }
+      _ccPlantillas = data.templates || [];
+    } catch (err) {
+      console.error('Error cargando plantillas:', err);
+      document.getElementById('ccPlantillaResultados').innerHTML = '<div style="padding:10px;font-size:12.5px;color:#B42318;">⚠️ No se pudo conectar con ChateaPro. Intenta de nuevo.</div>';
+    }
+  }
+
+  window.ccFiltrarPlantillas = function() {
+    var q = document.getElementById('ccPlantillaBuscar').value.trim().toLowerCase();
+    var cont = document.getElementById('ccPlantillaResultados');
+    if (!q) { cont.innerHTML = ''; return; }
+    var resultados = _ccPlantillas.filter(function(t) { return t.name.toLowerCase().indexOf(q) >= 0; });
+    if (!resultados.length) { cont.innerHTML = '<div style="padding:10px;font-size:12.5px;color:#9CA3AF;">No se encontraron plantillas aprobadas con ese nombre.</div>'; return; }
+    cont.innerHTML = resultados.map(function(t) {
+      var idx = _ccPlantillas.indexOf(t);
+      var preview = t.bodyPreview ? t.bodyPreview.substring(0, 90).replace(/</g, '&lt;') + (t.bodyPreview.length > 90 ? '...' : '') : '';
+      return '<div class="wa-plantilla-item" onclick="ccSeleccionarPlantilla(' + idx + ')" style="padding:10px;border:1px solid #ECEDF0;border-radius:8px;margin-bottom:6px;cursor:pointer;background:#fff;">' +
+        '<div style="font-weight:700;font-size:13px;color:#1B1D23;">' + t.name + '</div>' +
+        '<div style="font-size:11.5px;color:#6B7280;margin-top:3px;">' + preview + '</div>' +
+      '</div>';
+    }).join('');
+  };
+
+  window.ccSeleccionarPlantilla = function(idx) {
+    _ccPlantillaSeleccionada = _ccPlantillas[idx];
+    var el = document.getElementById('ccPlantillaSeleccionada');
+    el.style.display = 'flex'; el.style.alignItems = 'center'; el.style.justifyContent = 'space-between'; el.style.gap = '10px';
+    el.innerHTML = '<span>✅ Plantilla seleccionada: ' + _ccPlantillaSeleccionada.name + '</span>' +
+      '<span onclick="ccQuitarPlantilla()" title="Quitar selección" style="cursor:pointer;font-weight:800;color:#1E8E5A;flex-shrink:0;">✕</span>';
+    document.getElementById('ccPlantillaBuscar').value = '';
+    document.getElementById('ccPlantillaResultados').innerHTML = '';
+    var mediaCard = document.getElementById('ccMediaCard');
+    if (_ccPlantillaSeleccionada.hasImage) {
+      mediaCard.style.display = 'block';
+      if (!_ccMedia.length) ccCargarMedia();
+    } else {
+      mediaCard.style.display = 'none';
+      ccQuitarMedia();
+    }
+  };
+
+  window.ccQuitarPlantilla = function() {
+    _ccPlantillaSeleccionada = null;
+    var el = document.getElementById('ccPlantillaSeleccionada');
+    el.style.display = 'none'; el.innerHTML = '';
+    document.getElementById('ccMediaCard').style.display = 'none';
+    ccQuitarMedia();
+  };
+
+  async function ccCargarSubflows() {
+    var token = await obtenerTokenSesionActual();
+    if (!token) return;
+    try {
+      var r = await fetch('https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'list_subflows' })
+      });
+      var data = await r.json();
+      if (data.error) {
+        document.getElementById('ccSubflowResultados').innerHTML = '<div style="padding:10px;font-size:12.5px;color:#B42318;">⚠️ No se pudieron cargar los subflujos: ' + data.error + '</div>';
+        return;
+      }
+      _ccSubflows = data.subflows || [];
+    } catch (err) {
+      console.error('Error cargando subflujos:', err);
+      document.getElementById('ccSubflowResultados').innerHTML = '<div style="padding:10px;font-size:12.5px;color:#B42318;">⚠️ No se pudo conectar con ChateaPro. Intenta de nuevo.</div>';
+    }
+  }
+
+  window.ccFiltrarSubflows = function() {
+    var q = document.getElementById('ccSubflowBuscar').value.trim().toLowerCase();
+    var cont = document.getElementById('ccSubflowResultados');
+    if (!q) { cont.innerHTML = ''; return; }
+    var resultados = _ccSubflows.filter(function(s) { return s.name.toLowerCase().indexOf(q) >= 0; });
+    if (!resultados.length) { cont.innerHTML = '<div style="padding:10px;font-size:12.5px;color:#9CA3AF;">No se encontraron subflujos con ese nombre.</div>'; return; }
+    cont.innerHTML = resultados.map(function(s) {
+      var idx = _ccSubflows.indexOf(s);
+      return '<div class="wa-plantilla-item" onclick="ccSeleccionarSubflow(' + idx + ')" style="padding:10px;border:1px solid #ECEDF0;border-radius:8px;margin-bottom:6px;cursor:pointer;background:#fff;">' +
+        '<div style="font-weight:700;font-size:13px;color:#1B1D23;">' + s.name + '</div>' +
+      '</div>';
+    }).join('');
+  };
+
+  window.ccSeleccionarSubflow = function(idx) {
+    _ccSubflowSeleccionado = _ccSubflows[idx];
+    var el = document.getElementById('ccSubflowSeleccionado');
+    el.style.display = 'flex'; el.style.alignItems = 'center'; el.style.justifyContent = 'space-between'; el.style.gap = '10px';
+    el.innerHTML = '<span>✅ Subflujo seleccionado: ' + _ccSubflowSeleccionado.name + '</span>' +
+      '<span onclick="ccQuitarSubflow()" title="Quitar selección" style="cursor:pointer;font-weight:800;color:#1E8E5A;flex-shrink:0;">✕</span>';
+    document.getElementById('ccSubflowBuscar').value = '';
+    document.getElementById('ccSubflowResultados').innerHTML = '';
+  };
+
+  window.ccQuitarSubflow = function() {
+    _ccSubflowSeleccionado = null;
+    var el = document.getElementById('ccSubflowSeleccionado');
+    el.style.display = 'none'; el.innerHTML = '';
+  };
+
+  async function ccCargarMedia() {
+    var token = await obtenerTokenSesionActual();
+    if (!token) return;
+    try {
+      var r = await fetch('https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'list_media' })
+      });
+      var data = await r.json();
+      if (data.error) {
+        document.getElementById('ccMediaResultados').innerHTML = '<div style="padding:10px;font-size:12.5px;color:#B42318;">⚠️ No se pudo cargar la biblioteca de imágenes: ' + data.error + '</div>';
+        return;
+      }
+      _ccMedia = data.media || [];
+      ccRenderMediaGrid(_ccMedia.slice(0, 24));
+    } catch (err) {
+      console.error('Error cargando biblioteca de medios:', err);
+      document.getElementById('ccMediaResultados').innerHTML = '<div style="padding:10px;font-size:12.5px;color:#B42318;">⚠️ No se pudo conectar con ChateaPro. Intenta de nuevo.</div>';
+    }
+  }
+
+  function ccRenderMediaGrid(lista) {
+    var cont = document.getElementById('ccMediaResultados');
+    if (!lista.length) { cont.innerHTML = '<div style="padding:10px;font-size:12.5px;color:#9CA3AF;">No se encontraron imágenes con ese nombre.</div>'; return; }
+    cont.innerHTML = lista.map(function(m) {
+      var idx = _ccMedia.indexOf(m);
+      return '<div onclick="ccSeleccionarMedia(' + idx + ')" title="' + m.name + '" style="width:64px;height:64px;border:1px solid #ECEDF0;border-radius:8px;overflow:hidden;cursor:pointer;">' +
+        '<img src="' + m.url + '" style="width:100%;height:100%;object-fit:cover;display:block;">' +
+      '</div>';
+    }).join('');
+  }
+
+  window.ccFiltrarMedia = function() {
+    var q = document.getElementById('ccMediaBuscar').value.trim().toLowerCase();
+    if (!q) { ccRenderMediaGrid(_ccMedia.slice(0, 24)); return; }
+    var resultados = _ccMedia.filter(function(m) { return (m.name || '').toLowerCase().indexOf(q) >= 0; });
+    ccRenderMediaGrid(resultados);
+  };
+
+  window.ccSeleccionarMedia = function(idx) {
+    _ccMediaSeleccionada = _ccMedia[idx];
+    var el = document.getElementById('ccMediaSeleccionada');
+    el.style.display = 'flex'; el.style.alignItems = 'center'; el.style.justifyContent = 'space-between'; el.style.gap = '10px';
+    el.innerHTML = '<span style="display:flex;align-items:center;gap:8px;"><img src="' + _ccMediaSeleccionada.url + '" style="width:26px;height:26px;object-fit:cover;border-radius:4px;">✅ Imagen seleccionada: ' + _ccMediaSeleccionada.name + '</span>' +
+      '<span onclick="ccQuitarMedia()" title="Quitar selección" style="cursor:pointer;font-weight:800;color:#1E8E5A;flex-shrink:0;">✕</span>';
+    document.getElementById('ccMediaBuscar').value = '';
+    document.getElementById('ccMediaResultados').innerHTML = '';
+  };
+
+  window.ccQuitarMedia = function() {
+    _ccMediaSeleccionada = null;
+    var el = document.getElementById('ccMediaSeleccionada');
+    el.style.display = 'none'; el.innerHTML = '';
+  };
+
+  window.confirmarCambiarCampana = async function() {
+    var err = document.getElementById('ccModalError');
+    err.style.display = 'none'; err.textContent = '';
+
+    if (!_ccPlantillaSeleccionada) {
+      err.textContent = 'Selecciona una plantilla antes de guardar.';
+      err.style.display = 'block';
+      return;
+    }
+    if (_ccPlantillaSeleccionada.hasImage && !_ccMediaSeleccionada) {
+      err.textContent = 'Esta plantilla requiere una imagen de encabezado. Selecciona una.';
+      err.style.display = 'block';
+      return;
+    }
+
+    var btn = document.querySelector('#modalCambiarCampanaOverlay button[onclick="confirmarCambiarCampana()"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+    var token = await obtenerTokenSesionActual();
+    if (!token) {
+      err.textContent = 'Tu sesión expiró. Vuelve a iniciar sesión e intenta de nuevo.';
+      err.style.display = 'block';
+      if (btn) { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
+      return;
+    }
+
+    try {
+      var r = await fetch('https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_campaign_creative',
+          campanaId: _ccCampanaActivaId,
+          templateName: _ccPlantillaSeleccionada.name,
+          subFlowNs: _ccSubflowSeleccionado ? _ccSubflowSeleccionado.subFlowNs : null,
+          headerImageUrl: _ccMediaSeleccionada ? _ccMediaSeleccionada.url : null
+        })
+      });
+      var data = await r.json();
+      if (data.error) {
+        err.textContent = data.error;
+        err.style.display = 'block';
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
+        return;
+      }
+      cerrarModalCambiarCampana();
+      await cargarCampanasEnCurso();
+      renderizarCarrusel();
+    } catch (e) {
+      err.textContent = 'No se pudo guardar el cambio. Intenta de nuevo.';
+      err.style.display = 'block';
+      if (btn) { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
+    }
+  };
+
   function renderizarCarrusel() {
     var track = document.getElementById('productosCarouselTrack');
     var dots  = document.getElementById('productosCarouselDots');
@@ -4466,20 +4797,32 @@ window.PRODUCTO_IMGS = {
       ? '<div style="font-size:11px;color:var(--gray);margin-bottom:6px;">Provider: <b style="color:#FF7A1A;">' + p.proveedor + '</b></div>'
       : '';
 
-    // Aviso "Campaña en curso" (Fase 1): si este producto tiene una campaña
-    // de WhatsApp en_progreso, muestra un mini-resumen de su avance para que
-    // el dropshipper decida con información antes de tocarla (Fase 2 agregará
-    // las acciones de continuar / cambiar plantilla-imagen-flujo).
+    // Aviso "Campaña en curso" (Fase 1: mini-resumen · Fase 2: acciones
+    // continuar / cambiar plantilla-imagen-flujo sin crear una campaña nueva).
     var campanaEnCurso = window._campanasEnCursoPorProducto && window._campanasEnCursoPorProducto[p.nombre];
     var campanaBanner = '';
     if (campanaEnCurso) {
       var camEnviados = campanaEnCurso.enviados || 0;
       var camErrores = campanaEnCurso.errores || 0;
       var camPendientes = Math.max((campanaEnCurso.total_contactos || 0) - camEnviados - camErrores, 0);
+      var camId = campanaEnCurso.id;
       campanaBanner =
-        '<div style="margin:8px 0;padding:10px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;font-size:11.5px;color:#1E40AF;line-height:1.5;">' +
+        '<div style="margin:8px 0;padding:10px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;font-size:11.5px;color:#1E40AF;line-height:1.5;position:relative;">' +
           '<div style="font-weight:800;margin-bottom:2px;">🔄 Campaña en curso</div>' +
           camEnviados + ' enviados · ' + camPendientes + ' pendientes · Plantilla: <b>' + (campanaEnCurso.template_name || '—') + '</b>' +
+          '<div style="margin-top:8px;position:relative;">' +
+            '<button type="button" onclick="toggleMenuCampanaEnCurso(\'' + camId + '\')" ' +
+              'style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 10px;' +
+              'border-radius:7px;border:1px solid #93C5FD;background:#fff;color:#1E40AF;font-size:11.5px;font-weight:800;cursor:pointer;">' +
+              'Continuar con la campaña <span style="font-size:9px;">▾</span></button>' +
+            '<div id="ccMenu-' + camId + '" class="cc-dropdown-menu" style="display:none;position:absolute;left:0;right:0;top:100%;margin-top:4px;' +
+              'background:#fff;border:1px solid #D0D5DD;border-radius:8px;box-shadow:0 8px 20px rgba(16,24,40,.12);z-index:20;overflow:hidden;">' +
+              '<div onclick="continuarCampanaEnCurso(\'' + camId + '\')" ' +
+                'style="padding:10px 12px;font-size:12px;font-weight:700;color:#1E8E5A;cursor:pointer;border-bottom:1px solid #ECEDF0;">✅ Continuar con la campaña</div>' +
+              '<div onclick="abrirModalCambiarCampana(\'' + camId + '\', \'' + (p.nombre || '').replace(/'/g, "\\'") + '\')" ' +
+                'style="padding:10px 12px;font-size:12px;font-weight:700;color:#1B1D23;cursor:pointer;">✏️ Cambiar plantilla / imagen / flujo</div>' +
+            '</div>' +
+          '</div>' +
         '</div>';
     }
 
