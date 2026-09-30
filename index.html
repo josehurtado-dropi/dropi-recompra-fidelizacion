@@ -4405,6 +4405,37 @@ window.PRODUCTO_IMGS = {
   }
 
   // ── Renderizar (o re-renderizar) el carrusel de productos ──
+  // ── Cargar campañas de WhatsApp aún en curso, por producto ──
+  // Se usa para mostrar el aviso "Campaña en curso" en la tarjeta del
+  // producto correspondiente (Fase 1). Si un producto tiene más de una
+  // campaña en_progreso (no debería pasar en flujo normal), se toma la
+  // más reciente.
+  async function cargarCampanasEnCurso() {
+    window._campanasEnCursoPorProducto = {};
+    var token = await obtenerTokenSesionActual();
+    if (!token) return;
+    try {
+      var r = await fetch('https://tjfpnvlnqjfjjgjcjizb.supabase.co/functions/v1/chateapro', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'list_campaigns' })
+      });
+      var data = await r.json();
+      var campanas = data.campanas || [];
+      var porProducto = {};
+      campanas.forEach(function(c) {
+        if (c.estado !== 'en_progreso' || !c.producto) return;
+        var existente = porProducto[c.producto];
+        if (!existente || new Date(c.created_at) > new Date(existente.created_at)) {
+          porProducto[c.producto] = c;
+        }
+      });
+      window._campanasEnCursoPorProducto = porProducto;
+    } catch (err) {
+      console.error('Error cargando campañas en curso:', err);
+    }
+  }
+
   function renderizarCarrusel() {
     var track = document.getElementById('productosCarouselTrack');
     var dots  = document.getElementById('productosCarouselDots');
@@ -4434,6 +4465,23 @@ window.PRODUCTO_IMGS = {
     var prov = p.proveedor
       ? '<div style="font-size:11px;color:var(--gray);margin-bottom:6px;">Provider: <b style="color:#FF7A1A;">' + p.proveedor + '</b></div>'
       : '';
+
+    // Aviso "Campaña en curso" (Fase 1): si este producto tiene una campaña
+    // de WhatsApp en_progreso, muestra un mini-resumen de su avance para que
+    // el dropshipper decida con información antes de tocarla (Fase 2 agregará
+    // las acciones de continuar / cambiar plantilla-imagen-flujo).
+    var campanaEnCurso = window._campanasEnCursoPorProducto && window._campanasEnCursoPorProducto[p.nombre];
+    var campanaBanner = '';
+    if (campanaEnCurso) {
+      var camEnviados = campanaEnCurso.enviados || 0;
+      var camErrores = campanaEnCurso.errores || 0;
+      var camPendientes = Math.max((campanaEnCurso.total_contactos || 0) - camEnviados - camErrores, 0);
+      campanaBanner =
+        '<div style="margin:8px 0;padding:10px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;font-size:11.5px;color:#1E40AF;line-height:1.5;">' +
+          '<div style="font-weight:800;margin-bottom:2px;">🔄 Campaña en curso</div>' +
+          camEnviados + ' enviados · ' + camPendientes + ' pendientes · Plantilla: <b>' + (campanaEnCurso.template_name || '—') + '</b>' +
+        '</div>';
+    }
 
     var dur = BD.duraciones && BD.duraciones[p.nombre];
 
@@ -4480,6 +4528,7 @@ window.PRODUCTO_IMGS = {
         '<div class="prod-meta-row"><span>Producto</span><span>Órdenes <b>' + formatNum(p.ordenes) + '</b></span></div>' +
         '<div class="prod-name">' + p.nombre + '</div>' +
         prov +
+        campanaBanner +
         '<div class="prod-stat-row"><span>Entregados</span><span><b>' + formatNum(p.ordenes) + ' órdenes entregadas</b> ' + formatCOP(p.facturacion) + '</span></div>' +
         '<div class="prod-stat-row"><span>Ganancias</span><span><b style="color:#1E8E5A;">' + formatCOP(p.ganancias) + '</b></span></div>' +
         durInfo +
@@ -4800,7 +4849,7 @@ window.PRODUCTO_IMGS = {
       var autorizado = await verificarDropshipper(user.id);
       if (!autorizado) return;
       mostrarBtnLogout();
-      await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades(), cargarDuraciones()]);
+      await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades(), cargarDuraciones(), cargarCampanasEnCurso()]);
       await Promise.all([cargarProductos(), cargarAsistentes()]);
       setTimeout(aplicarParches, 500);
       setInterval(aplicarParches, 2500);
@@ -4840,7 +4889,7 @@ window.PRODUCTO_IMGS = {
         if (!autorizado) return;
         mostrarBtnLogout();
         window._usuarioActual = session.user;
-        await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades(), cargarDuraciones()]);
+        await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades(), cargarDuraciones(), cargarCampanasEnCurso()]);
         await Promise.all([cargarProductos(), cargarAsistentes()]);
         setTimeout(aplicarParches, 500);
         setInterval(aplicarParches, 2500);
