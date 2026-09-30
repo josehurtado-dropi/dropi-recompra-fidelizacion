@@ -4571,11 +4571,11 @@ window.PRODUCTO_IMGS = {
         var camDiasRestantes = Math.max(Math.ceil(camPend / 200), 1);
         var camFechaFin = new Date();
         camFechaFin.setDate(camFechaFin.getDate() + camDiasRestantes);
-        var camFechaFinStr = camDiasRestantes <= 1 ? 'hoy' : formatFechaDDMMYYYY(camFechaFin);
+        var camFechaFinTexto = camDiasRestantes <= 1 ? 'hoy' : ('el ' + formatFechaDDMMYYYY(camFechaFin));
         campanaInfoHtml =
           '<div class="segment-campana-info">' +
             '<div class="segment-campana-resumen">🔄 ' + camEnv + ' enviados · ' + camPend + ' pendientes · Plantilla: <b>' + (campanaEnCursoProducto.template_name || '—') + '</b></div>' +
-            '<div class="segment-campana-eta">✅ Terminará de enviar todos los mensajes aprox. el <b>' + camFechaFinStr + '</b></div>' +
+            '<div class="segment-campana-eta">✅ Terminará de enviar todos los mensajes aprox. <b>' + camFechaFinTexto + '</b></div>' +
           '</div>';
       }
       return '<div class="segment-row">' +
