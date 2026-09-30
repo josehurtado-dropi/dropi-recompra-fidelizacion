@@ -4764,6 +4764,7 @@ window.PRODUCTO_IMGS = {
       cerrarModalCambiarCampana();
       await cargarCampanasEnCurso();
       renderizarCarrusel();
+      alert('Listo — se actualizó la plantilla de la campaña en curso. Los clientes pendientes recibirán el mensaje nuevo.');
     } catch (e) {
       err.textContent = 'No se pudo guardar el cambio. Intenta de nuevo.';
       err.style.display = 'block';
