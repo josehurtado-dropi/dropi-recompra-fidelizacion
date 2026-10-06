@@ -4366,6 +4366,21 @@ window.PRODUCTO_IMGS = {
     }
     var data = _allRows;
     if (error) { console.error('[Supabase] Error pedidos:', error); return; }
+
+    // Exclusiones puntuales de productos por dropshipper: el producto no debe
+    // cargarse en el módulo para esa cuenta, sin importar por qué vía entró
+    // el dato a la tabla `pedidos` (carga manual por Excel o un script externo).
+    var PRODUCTOS_EXCLUIDOS_POR_DROPSHIPPER = {
+      '5ffa2685-5fa1-4dc9-a290-231f453141ef': ['ammara'] // tiendagoshop1021@gmail.com
+    };
+    var _excluidos = (window._usuarioActual && PRODUCTOS_EXCLUIDOS_POR_DROPSHIPPER[window._usuarioActual.id]) || [];
+    if (_excluidos.length && data && data.length) {
+      data = data.filter(function(row) {
+        var nombre = (row.nombre_producto || '').trim().toLowerCase();
+        return _excluidos.indexOf(nombre) === -1;
+      });
+    }
+
     if (!data || !data.length) {
       var track = document.getElementById('productosCarouselTrack');
       if (track) track.innerHTML =
