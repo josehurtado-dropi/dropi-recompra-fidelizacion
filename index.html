@@ -4850,19 +4850,20 @@ window.PRODUCTO_IMGS = {
           clientesReales = prodData.seg3_clientes;
         }
 
-        // FASE 1 — Contactos de prueba fijos para validar el envío real por
-        // WhatsApp (integración ChateaPro) antes de usarlo con clientes
-        // reales. Siempre aparecen como las 2 primeras filas de cualquier
-        // listado; el resto de los contactos sigue siendo el real. Se
-        // seleccionan/deseleccionan igual que cualquier otro, con el check
-        // de la fila.
-        var CONTACTOS_PRUEBA = [
-          { nombre: 'Jose', telefono: '3176703196', ciudad: '', departamento: '', transportadora: '', tipo_envio: '', cantidad: 1, valor_orden: 0, precio_flete: 0, fecha_entrega: '' },
-          { nombre: 'John', telefono: '3164228458', ciudad: '', departamento: '', transportadora: '', tipo_envio: '', cantidad: 1, valor_orden: 0, precio_flete: 0, fecha_entrega: '' },
-          { nombre: 'Evelyn', telefono: '3178153169', ciudad: '', departamento: '', transportadora: '', tipo_envio: '', cantidad: 1, valor_orden: 0, precio_flete: 0, fecha_entrega: '' },
-          { nombre: 'Sara', telefono: '3186054123', ciudad: '', departamento: '', transportadora: '', tipo_envio: '', cantidad: 1, valor_orden: 0, precio_flete: 0, fecha_entrega: '' }
-        ];
-        clientesReales = CONTACTOS_PRUEBA.concat(clientesReales);
+        // Contactos de prueba fijos para validar el envío real por WhatsApp
+        // (integración ChateaPro). Solo se agregan para la cuenta piloto
+        // original -- la cuenta demo y cualquier usuario nuevo nunca los ven,
+        // para no mostrar números de teléfono reales de pruebas en una demo.
+        var ES_CUENTA_PILOTO_ORIGINAL = window._usuarioActual && window._usuarioActual.id === '5ffa2685-5fa1-4dc9-a290-231f453141ef';
+        if (ES_CUENTA_PILOTO_ORIGINAL) {
+          var CONTACTOS_PRUEBA = [
+            { nombre: 'Jose', telefono: '3176703196', ciudad: '', departamento: '', transportadora: '', tipo_envio: '', cantidad: 1, valor_orden: 0, precio_flete: 0, fecha_entrega: '' },
+            { nombre: 'John', telefono: '3164228458', ciudad: '', departamento: '', transportadora: '', tipo_envio: '', cantidad: 1, valor_orden: 0, precio_flete: 0, fecha_entrega: '' },
+            { nombre: 'Evelyn', telefono: '3178153169', ciudad: '', departamento: '', transportadora: '', tipo_envio: '', cantidad: 1, valor_orden: 0, precio_flete: 0, fecha_entrega: '' },
+            { nombre: 'Sara', telefono: '3186054123', ciudad: '', departamento: '', transportadora: '', tipo_envio: '', cantidad: 1, valor_orden: 0, precio_flete: 0, fecha_entrega: '' }
+          ];
+          clientesReales = CONTACTOS_PRUEBA.concat(clientesReales);
+        }
 
         window._campanaActiva.clientes = clientesReales;
 
