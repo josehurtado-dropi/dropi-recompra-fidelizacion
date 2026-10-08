@@ -2294,6 +2294,8 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="content">
       <div class="view active" id="view-home">
 
+      <div class="greet" id="saludoDropshipper" style="display:none;"></div>
+
       <div class="card events-strip">
         <div class="promo-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
@@ -4985,6 +4987,31 @@ window.PRODUCTO_IMGS = {
     return true;
   }
 
+  // ── Saludo personalizado en Inicio ("¡Hola, Nombre!") ──────
+  // Usa el nombre guardado en `dropshippers`; si no hay nombre, lo arma a
+  // partir de la parte del correo antes de la @ (ej: vittastore@gmail.com -> Vittastore).
+  async function cargarSaludoDropshipper() {
+    if (!supa || !window._usuarioActual) return;
+    var nombre = '';
+    try {
+      var { data } = await supa
+        .from('dropshippers')
+        .select('nombre')
+        .eq('id', window._usuarioActual.id)
+        .single();
+      if (data && data.nombre) nombre = data.nombre.trim();
+    } catch (e) { /* sigue con el fallback por correo */ }
+    if (!nombre) {
+      var local = (window._usuarioActual.email || '').split('@')[0] || '';
+      nombre = local ? local.charAt(0).toUpperCase() + local.slice(1) : '';
+    }
+    var el = document.getElementById('saludoDropshipper');
+    if (el && nombre) {
+      el.textContent = '¡Hola, ' + nombre + '!';
+      el.style.display = 'block';
+    }
+  }
+
   // ── Mostrar botón cerrar sesión ──────────────────────────────
   function mostrarBtnLogout() {
     var btn = document.getElementById('btnCerrarSesion');
@@ -5006,7 +5033,7 @@ window.PRODUCTO_IMGS = {
       var autorizado = await verificarDropshipper(user.id);
       if (!autorizado) return;
       mostrarBtnLogout();
-      await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades(), cargarDuraciones(), cargarCampanasEnCurso()]);
+      await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades(), cargarDuraciones(), cargarCampanasEnCurso(), cargarSaludoDropshipper()]);
       await Promise.all([cargarProductos(), cargarAsistentes()]);
       setTimeout(aplicarParches, 500);
       setInterval(aplicarParches, 2500);
@@ -5046,7 +5073,7 @@ window.PRODUCTO_IMGS = {
         if (!autorizado) return;
         mostrarBtnLogout();
         window._usuarioActual = session.user;
-        await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades(), cargarDuraciones(), cargarCampanasEnCurso()]);
+        await Promise.all([cargarTienda(), cargarSegmentos(), cargarPlantillas(), cargarNombresCiudades(), cargarDuraciones(), cargarCampanasEnCurso(), cargarSaludoDropshipper()]);
         await Promise.all([cargarProductos(), cargarAsistentes()]);
         setTimeout(aplicarParches, 500);
         setInterval(aplicarParches, 2500);
