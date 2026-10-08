@@ -146,6 +146,7 @@
   .filter-block{display:flex; flex-direction:column; gap:4px;}
   .filter-label{font-size:11.5px; color:var(--gray); font-weight:700;}
   .filter-input{border:1px solid var(--line); border-radius:8px; padding:8px 12px; font-size:13px; font-weight:600; color:var(--ink); background:#fff; min-width:170px;}
+  .filter-static{padding:8px 0; font-size:13px; font-weight:700; color:var(--ink);}
 
   /* ============ CARRUSEL DE PRODUCTOS (Informe de productos) ============ */
   .carousel-wrap{display:block;}
@@ -2354,11 +2355,11 @@ document.addEventListener('DOMContentLoaded', function() {
           <div class="report-filters">
             <div class="filter-block">
               <span class="filter-label">Fecha</span>
-              <div class="filter-input">Ultimo Año ▾</div>
+              <div class="filter-static">Último año</div>
             </div>
             <div class="filter-block">
               <span class="filter-label">Estado</span>
-              <div class="filter-input">ENTREGADO ▾</div>
+              <div class="filter-static">ENTREGADO</div>
             </div>
           </div>
         </div>
