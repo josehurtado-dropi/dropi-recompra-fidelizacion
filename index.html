@@ -2594,6 +2594,13 @@ document.addEventListener('DOMContentLoaded', function() {
       cont.innerHTML = '<div style="padding:24px;text-align:center;color:#6B7280;font-size:13px;">Cargando historial...</div>';
       return;
     }
+    // Esta tabla se reconstruye por completo cada vez que se entra a Historial
+    // o se da clic en "Actualizar". Sin este reinicio, _historialDetalleCargado
+    // sigue marcando como "ya cargado" filas que fueron reemplazadas por filas
+    // nuevas con el placeholder "Cargando desglose por día..." sin datos reales,
+    // dejando ese texto ahí para siempre porque toggleHistorialDetalle ya no
+    // vuelve a pedirlo.
+    _historialDetalleCargado = {};
     if(!campanas.length){
       cont.innerHTML = '<div style="padding:24px;text-align:center;color:#6B7280;font-size:13px;">Todavía no has ejecutado ninguna campaña.</div>';
       return;
